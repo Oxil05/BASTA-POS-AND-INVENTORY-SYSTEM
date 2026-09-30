@@ -233,7 +233,7 @@ class BastaLoginApp(ctk.CTk):
         self.title("BASTA BURGER - Log In")
         window_width = 1180
         window_height = 760
-        self.minsize(980, 680)
+        self.minsize(800, 560)
         
         # Center the window on display
         screen_width = self.winfo_screenwidth()
@@ -313,9 +313,9 @@ class BastaLoginApp(ctk.CTk):
         self.center_content_frame.grid(row=1, column=0, sticky="ew", padx=48)
         self.center_content_frame.grid_columnconfigure(0, weight=1)
         
-        # Inner constrained frame for input controls (width ~380px)
-        self.form_inner_frame = ctk.CTkFrame(self.center_content_frame, fg_color="transparent", width=380)
-        self.form_inner_frame.grid(row=0, column=0)
+        # Inner responsive frame for input controls
+        self.form_inner_frame = ctk.CTkFrame(self.center_content_frame, fg_color="transparent")
+        self.form_inner_frame.grid(row=0, column=0, sticky="ew")
         self.form_inner_frame.grid_columnconfigure(0, weight=1)
         
         # Welcome back pre-title
@@ -361,14 +361,14 @@ class BastaLoginApp(ctk.CTk):
         )
         self.email_label.grid(row=3, column=0, sticky="w", pady=(0, 6))
         
-        # Email input container box
+        # Email input container box (rounded)
         self.email_container = ctk.CTkFrame(
             self.form_inner_frame,
             fg_color="#FFFFFF",
             border_color="#D1D5DB",
             border_width=1,
-            corner_radius=9,
-            height=44
+            corner_radius=12,
+            height=46
         )
         self.email_container.grid(row=4, column=0, sticky="ew", pady=(0, 16))
         self.email_container.grid_columnconfigure(1, weight=1)
@@ -412,13 +412,14 @@ class BastaLoginApp(ctk.CTk):
         self.password_label.grid(row=5, column=0, sticky="w", pady=(0, 6))
         
         # Password input container box
+        # Password input container box (rounded)
         self.password_container = ctk.CTkFrame(
             self.form_inner_frame,
             fg_color="#FFFFFF",
             border_color="#D1D5DB",
             border_width=1,
-            corner_radius=9,
-            height=44
+            corner_radius=12,
+            height=46
         )
         self.password_container.grid(row=6, column=0, sticky="ew", pady=(0, 14))
         self.password_container.grid_columnconfigure(1, weight=1)
@@ -526,7 +527,7 @@ class BastaLoginApp(ctk.CTk):
         )
         self.status_message_label.grid(row=8, column=0, sticky="w", pady=(0, 6))
         
-        # Log in action button
+        # Log in action button (rounded & responsive)
         self.login_button = ctk.CTkButton(
             self.form_inner_frame,
             text="Log in  →",
@@ -535,7 +536,7 @@ class BastaLoginApp(ctk.CTk):
             hover_color="#27272A",
             text_color="#FFFFFF",
             height=46,
-            corner_radius=10,
+            corner_radius=12,
             cursor="hand2",
             command=self.handle_login
         )
@@ -621,11 +622,11 @@ class BastaLoginApp(ctk.CTk):
         available_width = event.width
         available_height = event.height
         
-        target_size = min(available_width - 80, available_height - 80, 640)
-        target_size = max(target_size, 380)
+        target_size = min(available_width - 60, available_height - 60, 580)
+        target_size = max(target_size, 180)
         
         # Update only if size delta is noticeable (avoids unnecessary redraw lag)
-        if abs(target_size - self.last_badge_size) > 25:
+        if abs(target_size - self.last_badge_size) > 20:
             self.last_badge_size = target_size
             new_pil_image = create_circular_badge(self.logo_file_path, size=target_size)
             self.badge_ctk_image = ctk.CTkImage(
@@ -653,7 +654,7 @@ class BastaLoginApp(ctk.CTk):
             self.is_password_visible = True
 
     def handle_login(self):
-        """Validates credentials and provides feedback."""
+        """Validates credentials, provides feedback, and redirects to POS."""
         entered_email = self.email_entry.get().strip()
         entered_password = self.password_entry.get().strip()
         
@@ -664,7 +665,6 @@ class BastaLoginApp(ctk.CTk):
             )
             return
             
-        # Demo / placeholder authentication check
         self.status_message_label.configure(
             text="Authenticating...",
             text_color="#2563EB"
@@ -676,6 +676,17 @@ class BastaLoginApp(ctk.CTk):
             text="Login successful! Redirecting to POS...",
             text_color="#16A34A"
         )
+        self.after(450, self.launch_pos_app)
+
+    def launch_pos_app(self):
+        """Transition from login screen to POS main screen."""
+        self.destroy()
+        try:
+            from ProjectMain.POS import BastaPOSApp
+            pos_instance = BastaPOSApp()
+            pos_instance.mainloop()
+        except Exception as error:
+            print(f"[BASTA POS] POS launch error: {error}")
 
     def show_help_dialog(self):
         """Displays support contact information."""
