@@ -4,15 +4,7 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="11a5b185-98e4-4deb-9c40-412826a55aaf" name="Changes" comment="Created products.py and dashboard.py">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/ProjectMain/POS.py" beforeDir="false" afterPath="$PROJECT_DIR$/ProjectMain/POS.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/ProjectMain/account_settings.py" beforeDir="false" afterPath="$PROJECT_DIR$/ProjectMain/account_settings.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/ProjectMain/database.py" beforeDir="false" afterPath="$PROJECT_DIR$/ProjectMain/database.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/ProjectMain/login.py" beforeDir="false" afterPath="$PROJECT_DIR$/ProjectMain/login.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/ProjectMain/product_management.py" beforeDir="false" afterPath="$PROJECT_DIR$/ProjectMain/product_management.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/ProjectMain/reports.py" beforeDir="false" afterPath="$PROJECT_DIR$/ProjectMain/reports.py" afterDir="false" />
-    </list>
+    <list default="true" id="11a5b185-98e4-4deb-9c40-412826a55aaf" name="Changes" comment="Created products.py and dashboard.py" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
