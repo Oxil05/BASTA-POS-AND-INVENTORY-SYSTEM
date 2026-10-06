@@ -290,8 +290,8 @@ def verify_user_login(username, password):
     try:
         cursor = conn.cursor(dictionary=True)
         cursor.execute(
-            "SELECT * FROM `users` WHERE `username` = %s AND `password_hash` = %s AND `status` = 'Active' LIMIT 1;",
-            (username, password)
+            "SELECT * FROM `users` WHERE (`username` = %s OR `email` = %s) AND `password_hash` = %s AND `status` = 'Active' LIMIT 1;",
+            (username, username, password)
         )
         user = cursor.fetchone()
         cursor.close()
@@ -301,6 +301,185 @@ def verify_user_login(username, password):
         return False, None
     except Exception:
         return False, None
+
+
+# --- PRODUCT DATA MANIPULATION (CRUD) ---
+
+def add_product(name, sku, category, price, cost_price=0.0, stock_quantity=0, low_stock_threshold=10, in_store=True, online_ordering=True, grabfood=False):
+    """Inserts a new product into MySQL database."""
+    conn = get_db_connection()
+    if not conn:
+        return None
+    try:
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO `products` (`name`, `sku`, `category`, `price`, `cost_price`, `stock_quantity`, `low_stock_threshold`, `in_store`, `online_ordering`, `grabfood`, `status`)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'Active');
+        """, (name, sku, category, price, cost_price, stock_quantity, low_stock_threshold, in_store, online_ordering, grabfood))
+        conn.commit()
+        new_id = cursor.lastrowid
+        cursor.close()
+        conn.close()
+        return new_id
+    except Exception as err:
+        print(f"[BASTA DB] Add product error: {err}")
+        return None
+
+
+def update_product(product_id, name, sku, category, price, cost_price, stock_quantity, low_stock_threshold, in_store, online_ordering, grabfood):
+    """Updates an existing product in MySQL database."""
+    conn = get_db_connection()
+    if not conn:
+        return False
+    try:
+        cursor = conn.cursor()
+        cursor.execute("""
+            UPDATE `products`
+            SET `name` = %s, `sku` = %s, `category` = %s, `price` = %s, `cost_price` = %s,
+                `stock_quantity` = %s, `low_stock_threshold` = %s, `in_store` = %s,
+                `online_ordering` = %s, `grabfood` = %s
+            WHERE `id` = %s;
+        """, (name, sku, category, price, cost_price, stock_quantity, low_stock_threshold, in_store, online_ordering, grabfood, product_id))
+        conn.commit()
+        cursor.close()
+        conn.close()
+        return True
+    except Exception as err:
+        print(f"[BASTA DB] Update product error: {err}")
+        return False
+
+
+def delete_product(product_id):
+    """Deletes a product from MySQL database by ID."""
+    conn = get_db_connection()
+    if not conn:
+        return False
+    try:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM `products` WHERE `id` = %s;", (product_id,))
+        conn.commit()
+        cursor.close()
+        conn.close()
+        return True
+    except Exception as err:
+        print(f"[BASTA DB] Delete product error: {err}")
+        return False
+
+
+def deduct_product_stock(product_name, quantity):
+    """Decrements stock quantity of a product in MySQL."""
+    conn = get_db_connection()
+    if not conn:
+        return False
+    try:
+        cursor = conn.cursor()
+        cursor.execute("""
+            UPDATE `products`
+            SET `stock_quantity` = GREATEST(0, `stock_quantity` - %s)
+            WHERE `name` = %s;
+        """, (quantity, product_name))
+        conn.commit()
+        cursor.close()
+        conn.close()
+        return True
+    except Exception as err:
+        print(f"[BASTA DB] Deduct stock error: {err}")
+        return False
+
+
+# --- USER DATA MANIPULATION (CRUD) ---
+
+def add_user(username, password_hash, full_name, email, role="Cashier", status="Active"):
+    """Inserts a new user account into MySQL database."""
+    conn = get_db_connection()
+    if not conn:
+        return None
+    try:
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO `users` (`username`, `password_hash`, `full_name`, `email`, `role`, `status`)
+            VALUES (%s, %s, %s, %s, %s, %s);
+        """, (username, password_hash, full_name, email, role, status))
+        conn.commit()
+        new_id = cursor.lastrowid
+        cursor.close()
+        conn.close()
+        return new_id
+    except Exception as err:
+        print(f"[BASTA DB] Add user error: {err}")
+        return None
+
+
+def update_user(user_id, full_name, email, role, status="Active"):
+    """Updates user information in MySQL database."""
+    conn = get_db_connection()
+    if not conn:
+        return False
+    try:
+        cursor = conn.cursor()
+        cursor.execute("""
+            UPDATE `users`
+            SET `full_name` = %s, `email` = %s, `role` = %s, `status` = %s
+            WHERE `id` = %s;
+        """, (full_name, email, role, status, user_id))
+        conn.commit()
+        cursor.close()
+        conn.close()
+        return True
+    except Exception as err:
+        print(f"[BASTA DB] Update user error: {err}")
+        return False
+
+
+def delete_user(user_id):
+    """Deletes a user account from MySQL database."""
+    conn = get_db_connection()
+    if not conn:
+        return False
+    try:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM `users` WHERE `id` = %s;", (user_id,))
+        conn.commit()
+        cursor.close()
+        conn.close()
+        return True
+    except Exception as err:
+        print(f"[BASTA DB] Delete user error: {err}")
+        return False
+
+
+# --- TRANSACTION RECORDING ---
+
+def record_sale_transaction(transaction_id, order_id, table_num, cashier_name, payment_method, subtotal, vat, service_charge, total, cash_received, change_due, items):
+    """Records completed order transaction and its line items in MySQL."""
+    conn = get_db_connection()
+    if not conn:
+        return False
+    try:
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO `sales_transactions`
+            (`transaction_id`, `order_id`, `table_num`, `cashier_name`, `payment_method`, `subtotal`, `vat`, `service_charge`, `total`, `cash_received`, `change_due`)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
+        """, (transaction_id, order_id, table_num, cashier_name, payment_method, subtotal, vat, service_charge, total, cash_received, change_due))
+
+        for itm in items:
+            name = itm.get("name", "Item")
+            qty = itm.get("qty", 1)
+            price = itm.get("price", 0.0)
+            line_tot = price * qty
+            cursor.execute("""
+                INSERT INTO `transaction_items` (`transaction_id`, `product_name`, `quantity`, `unit_price`, `line_total`)
+                VALUES (%s, %s, %s, %s, %s);
+            """, (transaction_id, name, qty, price, line_tot))
+
+        conn.commit()
+        cursor.close()
+        conn.close()
+        return True
+    except Exception as err:
+        print(f"[BASTA DB] Record sale error: {err}")
+        return False
 
 
 if __name__ == "__main__":

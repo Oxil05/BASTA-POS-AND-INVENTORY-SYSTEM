@@ -42,8 +42,8 @@ class AccountSettingsView(customtkinter.CTkFrame):
         super().__init__(master, fg_color="#f1f5f9", **kwargs)
         self.app_controller = app_controller
 
-        # Account dataset
-        self.accounts = [
+        # Account dataset: load from database or fallback
+        default_accounts = [
             {"id": 1, "name": "Chef Marco Santos", "email": "marco.s@bastaburger.ph", "user": "marco_admin", "role": "Administrator", "status": "Active", "last_login": "Today, 08:30 AM"},
             {"id": 2, "name": "Bea Mendoza", "email": "bea.m@bastaburger.ph", "user": "bea_cashier", "role": "Cashier", "status": "Active", "last_login": "Today, 09:12 AM"},
             {"id": 3, "name": "Danilo Reyes", "email": "danilo.r@bastaburger.ph", "user": "dan_shift", "role": "Shift Supervisor", "status": "Active", "last_login": "Yesterday, 10:45 PM"},
@@ -51,6 +51,26 @@ class AccountSettingsView(customtkinter.CTkFrame):
             {"id": 5, "name": "Chloe Villanueva", "email": "chloe.v@bastaburger.ph", "user": "chloe_pos", "role": "Cashier", "status": "Active", "last_login": "2 days ago"},
             {"id": 6, "name": "Rafael Dizon", "email": "rafael.d@bastaburger.ph", "user": "raf_d", "role": "Administrator", "status": "Active", "last_login": "5 days ago"}
         ]
+
+        self.accounts = default_accounts
+        try:
+            from database import fetch_all_users
+            db_users = fetch_all_users()
+            if db_users:
+                self.accounts = [
+                    {
+                        "id": u["id"],
+                        "name": u["full_name"],
+                        "email": u["email"] or f"{u['username']}@bastaburger.ph",
+                        "user": u["username"],
+                        "role": u["role"],
+                        "status": u["status"],
+                        "last_login": str(u.get("last_login") or "Never")
+                    }
+                    for u in db_users
+                ]
+        except Exception:
+            pass
 
         self.selected_account = None
 
@@ -268,8 +288,17 @@ class AccountSettingsView(customtkinter.CTkFrame):
             sel_role = role_cb.get()
 
             if f_name and u_name:
+                new_id = len(self.accounts) + 1
+                try:
+                    from database import add_user
+                    db_id = add_user(u_name, "staff123", f_name, email or f"{u_name}@bastaburger.ph", sel_role, "Active")
+                    if db_id:
+                        new_id = db_id
+                except Exception as e:
+                    print(f"[BASTA DB] User add notice: {e}")
+
                 self.accounts.append({
-                    "id": len(self.accounts) + 1,
+                    "id": new_id,
                     "name": f_name,
                     "email": email or f"{u_name}@bastaburger.ph",
                     "user": u_name,
@@ -308,9 +337,19 @@ class AccountSettingsView(customtkinter.CTkFrame):
         role_cb.pack(padx=30, pady=(2, 18))
 
         def confirm_save():
-            acc["name"] = name_e.get().strip()
-            acc["email"] = email_e.get().strip()
-            acc["role"] = role_cb.get()
+            new_name = name_e.get().strip()
+            new_email = email_e.get().strip()
+            new_role = role_cb.get()
+
+            try:
+                from database import update_user
+                update_user(acc["id"], new_name, new_email, new_role, acc.get("status", "Active"))
+            except Exception as e:
+                print(f"[BASTA DB] User update notice: {e}")
+
+            acc["name"] = new_name
+            acc["email"] = new_email
+            acc["role"] = new_role
             modal.destroy()
             self.render_accounts_table()
 
@@ -320,6 +359,12 @@ class AccountSettingsView(customtkinter.CTkFrame):
 
     def delete_account(self, acc):
         if acc in self.accounts:
+            try:
+                from database import delete_user
+                delete_user(acc["id"])
+            except Exception as e:
+                print(f"[BASTA DB] User delete notice: {e}")
+
             self.accounts.remove(acc)
             self.render_accounts_table()
 

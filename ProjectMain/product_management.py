@@ -42,8 +42,8 @@ class ProductManagementView(customtkinter.CTkFrame):
         super().__init__(master, fg_color="#f1f5f9", **kwargs)
         self.app_controller = app_controller
 
-        # Active Products Dataset
-        self.products_data = [
+        # Load products from database or fallback to default dataset
+        default_products = [
             {
                 "id": 1, "sku": "BUR-001", "name": "Classic Basta Smash Burger", "category": "Burgers",
                 "price": 189.00, "cost_price": 85.00, "stock": 32, "low_stock": 10,
@@ -81,7 +81,32 @@ class ProductManagementView(customtkinter.CTkFrame):
             }
         ]
 
-        self.selected_product = self.products_data[0]
+        self.products_data = default_products
+        try:
+            from database import fetch_all_products
+            db_prods = fetch_all_products()
+            if db_prods:
+                self.products_data = [
+                    {
+                        "id": p["id"],
+                        "sku": p["sku"],
+                        "name": p["name"],
+                        "category": p["category"],
+                        "price": float(p["price"]),
+                        "cost_price": float(p.get("cost_price", 0.0) or 0.0),
+                        "stock": int(p.get("stock_quantity", 0)),
+                        "low_stock": int(p.get("low_stock_threshold", 10)),
+                        "in_store": bool(p.get("in_store", 1)),
+                        "online": bool(p.get("online_ordering", 1)),
+                        "grabfood": bool(p.get("grabfood", 0)),
+                        "status": p.get("status", "Active")
+                    }
+                    for p in db_prods
+                ]
+        except Exception:
+            pass
+
+        self.selected_product = self.products_data[0] if self.products_data else None
         self.is_creating_new = False
 
         # Grid configuration: Column 0 is main catalog, Column 1 is right drawer
@@ -432,8 +457,20 @@ class ProductManagementView(customtkinter.CTkFrame):
         p_cat = self.category_combo.get()
 
         if self.is_creating_new or not self.selected_product:
+            new_id = len(self.products_data) + 1
+            try:
+                from database import add_product
+                db_id = add_product(
+                    p_name, p_sku, p_cat, p_price, p_cost, p_stock, p_low,
+                    bool(self.in_store_switch.get()), bool(self.online_switch.get()), bool(self.grabfood_switch.get())
+                )
+                if db_id:
+                    new_id = db_id
+            except Exception as e:
+                print(f"[BASTA DB] Product add notice: {e}")
+
             new_prod = {
-                "id": len(self.products_data) + 1,
+                "id": new_id,
                 "sku": p_sku, "name": p_name, "category": p_cat,
                 "price": p_price, "cost_price": p_cost, "stock": p_stock, "low_stock": p_low,
                 "in_store": bool(self.in_store_switch.get()),
@@ -445,6 +482,15 @@ class ProductManagementView(customtkinter.CTkFrame):
             self.selected_product = new_prod
             self.is_creating_new = False
         else:
+            try:
+                from database import update_product
+                update_product(
+                    self.selected_product["id"], p_name, p_sku, p_cat, p_price, p_cost, p_stock, p_low,
+                    bool(self.in_store_switch.get()), bool(self.online_switch.get()), bool(self.grabfood_switch.get())
+                )
+            except Exception as e:
+                print(f"[BASTA DB] Product update notice: {e}")
+
             self.selected_product.update({
                 "name": p_name, "sku": p_sku, "category": p_cat,
                 "price": p_price, "cost_price": p_cost, "stock": p_stock, "low_stock": p_low,
@@ -456,12 +502,26 @@ class ProductManagementView(customtkinter.CTkFrame):
         self.populate_drawer(self.selected_product)
         self.render_product_list(query=self.search_entry.get().strip())
 
+        # Notify main controller (POS) to synchronize immediately
+        if self.app_controller and hasattr(self.app_controller, "sync_products_from_management"):
+            self.app_controller.sync_products_from_management()
+
     def delete_current_product(self):
         if self.selected_product and self.selected_product in self.products_data:
+            try:
+                from database import delete_product
+                delete_product(self.selected_product["id"])
+            except Exception as e:
+                print(f"[BASTA DB] Product delete notice: {e}")
+
             self.products_data.remove(self.selected_product)
             self.selected_product = self.products_data[0] if self.products_data else None
             self.populate_drawer(self.selected_product)
             self.render_product_list(query=self.search_entry.get().strip())
+
+            # Notify main controller (POS) to synchronize immediately
+            if self.app_controller and hasattr(self.app_controller, "sync_products_from_management"):
+                self.app_controller.sync_products_from_management()
 
     def on_search(self, event=None):
         self.render_product_list(query=self.search_entry.get().strip())

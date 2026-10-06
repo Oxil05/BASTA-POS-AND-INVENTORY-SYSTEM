@@ -276,27 +276,32 @@ class ReportsView(customtkinter.CTkFrame):
         customtkinter.CTkLabel(tx_head, text="Recent Transactions Audit Log", font=customtkinter.CTkFont(size=14, weight="bold"), text_color="#09090b").grid(row=0, column=0, sticky="w")
         customtkinter.CTkLabel(tx_head, text="Showing latest 5 orders", font=customtkinter.CTkFont(size=11), text_color="#64748b").grid(row=0, column=1, sticky="e")
 
-        table_f = customtkinter.CTkFrame(tx_card, fg_color="transparent")
-        table_f.grid(row=1, column=0, sticky="ew", padx=16, pady=(0, 16))
+        self.table_f = customtkinter.CTkFrame(tx_card, fg_color="transparent")
+        self.table_f.grid(row=1, column=0, sticky="ew", padx=16, pady=(0, 16))
         for c in range(7):
-            table_f.grid_columnconfigure(c, weight=1)
-        table_f.grid_columnconfigure(3, weight=2)
+            self.table_f.grid_columnconfigure(c, weight=1)
+        self.table_f.grid_columnconfigure(3, weight=2)
 
-        t_headers = ["TXN ID", "ORDER #", "TIME", "ITEMS", "PAYMENT", "CASHIER", "TOTAL"]
-        for c_idx, h in enumerate(t_headers):
-            customtkinter.CTkLabel(table_f, text=h, font=customtkinter.CTkFont(size=10, weight="bold"), text_color="#64748b").grid(row=0, column=c_idx, sticky="w", padx=6, pady=8)
-
-        txns = [
+        self.transactions_data = [
             ("TXN-0928-1048", "#B-1048", "Today 09:48 AM", "2x Smash, 1x Fries, 1x Ube Shake", "Cash", "Bea M.", "₱968.00"),
             ("TXN-0928-1047", "#B-1047", "Today 09:32 AM", "1x Truffle Burger, 1x Calamansi Fizz", "GCash", "Bea M.", "₱344.00"),
             ("TXN-0928-1046", "#B-1046", "Today 09:15 AM", "3x Bacon Deluxe, 2x Fries", "Card", "Marco S.", "₱845.00"),
             ("TXN-0928-1045", "#B-1045", "Today 08:50 AM", "1x Classic Smash, 1x Cold Brew", "Cash", "Bea M.", "₱284.00"),
             ("TXN-0928-1044", "#B-1044", "Today 08:30 AM", "4x Brioche Ice Cream Buns", "Maya", "Marco S.", "₱476.00")
         ]
+        self.render_transactions_table()
 
-        for r_idx, (t_id, ord_id, t_time, itm, pay, cash, tot) in enumerate(txns, start=1):
+    def render_transactions_table(self):
+        for w in self.table_f.winfo_children():
+            w.destroy()
+
+        t_headers = ["TXN ID", "ORDER #", "TIME", "ITEMS", "PAYMENT", "CASHIER", "TOTAL"]
+        for c_idx, h in enumerate(t_headers):
+            customtkinter.CTkLabel(self.table_f, text=h, font=customtkinter.CTkFont(size=10, weight="bold"), text_color="#64748b").grid(row=0, column=c_idx, sticky="w", padx=6, pady=8)
+
+        for r_idx, (t_id, ord_id, t_time, itm, pay, cash, tot) in enumerate(self.transactions_data[:10], start=1):
             row_bg = "#f8fafc" if r_idx % 2 == 0 else "#ffffff"
-            r_box = customtkinter.CTkFrame(table_f, fg_color=row_bg, corner_radius=6)
+            r_box = customtkinter.CTkFrame(self.table_f, fg_color=row_bg, corner_radius=6)
             r_box.grid(row=r_idx, column=0, columnspan=7, sticky="ew", pady=2)
             for c in range(7):
                 r_box.grid_columnconfigure(c, weight=1)
@@ -313,6 +318,29 @@ class ReportsView(customtkinter.CTkFrame):
 
             customtkinter.CTkLabel(r_box, text=cash, font=customtkinter.CTkFont(size=11), text_color="#475569").grid(row=0, column=5, sticky="w", padx=6, pady=8)
             customtkinter.CTkLabel(r_box, text=tot, font=customtkinter.CTkFont(size=12, weight="bold"), text_color="#09090b").grid(row=0, column=6, sticky="w", padx=6, pady=8)
+
+    def add_completed_transaction(self, t_id, ord_id, t_time, itm, pay, cash, tot_val):
+        """Adds a completed POS transaction to the live reports audit log and metric counters."""
+        self.transactions_data.insert(0, (t_id, ord_id, t_time, itm, pay, cash, f"₱{tot_val:,.2f}"))
+        self.render_transactions_table()
+
+        # Update Daily metrics
+        try:
+            m_list = self.period_data["Daily"]["metrics"]
+            # Increment Gross Sales
+            curr_gross_str = m_list[0]["val"].replace("₱", "").replace(",", "")
+            new_gross = float(curr_gross_str) + tot_val
+            m_list[0]["val"] = f"₱{new_gross:,.2f}"
+
+            # Increment Total Orders
+            curr_ord_str = m_list[3]["val"].replace(" orders", "").replace(",", "")
+            new_ord = int(curr_ord_str) + 1
+            m_list[3]["val"] = f"{new_ord} orders"
+
+            if self.active_period == "Daily":
+                self.render_metric_cards()
+        except Exception:
+            pass
 
     def render_metric_cards(self):
         for w in self.metrics_container.winfo_children():

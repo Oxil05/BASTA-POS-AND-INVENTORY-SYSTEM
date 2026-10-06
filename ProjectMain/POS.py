@@ -1,5 +1,6 @@
 import os
 import sys
+from datetime import datetime
 from PIL import Image
 import customtkinter
 
@@ -619,10 +620,12 @@ class PaymentCompleteWindow(customtkinter.CTkToplevel):
 class BastaPOSApp(customtkinter.CTk):
     """Main POS Application window recreation with full interactivity and responsiveness."""
 
-    def __init__(self, initial_view="pos"):
+    def __init__(self, initial_view="pos", current_user="Chef Marco S."):
         super().__init__()
 
         self.initial_view = initial_view
+        self.current_user = current_user
+        self.order_counter = 1048
         self.title("BASTA POS")
         self.geometry("1440x880")
         self.minsize(1080, 680)
@@ -634,24 +637,11 @@ class BastaPOSApp(customtkinter.CTk):
         self.sidebar_logo_img = get_logo_image(size=(52, 52))
         self.product_placeholder_img = get_logo_image(size=(105, 75))
 
-        # Products catalog data
-        self.catalog_products = [
-            {"id": "p1", "name": "Basta Smash Burger", "category": "Burgers", "sub": "Burgers · 18 left", "price": 245.0, "icon": "🍔"},
-            {"id": "p2", "name": "Crispy Chicken Sandwich", "category": "Burgers", "sub": "Sandwiches · 12 left", "price": 225.0, "icon": "🥪"},
-            {"id": "p3", "name": "Truffle Parm Fries", "category": "Sides", "sub": "Sides · 24 left", "price": 145.0, "icon": "🍟"},
-            {"id": "p4", "name": "Basta Bolognese", "category": "Meals", "sub": "Pasta · 9 left", "price": 295.0, "icon": "🍝"},
-            {"id": "p5", "name": "Calamansi Wings", "category": "Meals", "sub": "Mains · 14 left", "price": 265.0, "icon": "🍗"},
-            {"id": "p6", "name": "Charred Caesar", "category": "Sides", "sub": "Greens · 7 left", "price": 195.0, "icon": "🥗"},
-            {"id": "p7", "name": "Ube Milkshake", "category": "Drinks", "sub": "Drinks · 16 left", "price": 165.0, "icon": "🥤"},
-            {"id": "p8", "name": "Sea Salt Cookie", "category": "Sides", "sub": "Desserts · 21 left", "price": 95.0, "icon": "🍪"}
-        ]
+        # Products catalog data (dynamically populated from ProductManagementView)
+        self.catalog_products = []
 
         # Active cart state dictionary
-        self.cart_items = {
-            "Basta Smash Burger": {"qty": 2, "price": 285.0, "notes": "No onions · add bacon"},
-            "Truffle Parm Fries": {"qty": 1, "price": 145.0, "notes": "For sharing"},
-            "Ube Milkshake": {"qty": 1, "price": 165.0, "notes": "Less sweet"}
-        }
+        self.cart_items = {}
 
         # Filter state
         self.active_category = "🔥 All Items"
@@ -680,14 +670,14 @@ class BastaPOSApp(customtkinter.CTk):
         self.pos_view.grid_columnconfigure(0, weight=4)  # Main order catalog
         self.pos_view.grid_columnconfigure(1, weight=2)  # Right checkout panel
 
-        self._build_main_catalog()
-        self._build_checkout_panel()
-
-        # 2. Reusable Modular Views embedded inside one system
+        # 2. Reusable Modular Views embedded inside one system (instantiated before catalog to allow sync)
         self.products_view = ProductManagementView(self.content_container, app_controller=self)
         self.inventory_view = InventoryOverviewView(self.content_container, app_controller=self)
         self.reports_view = ReportsView(self.content_container, app_controller=self)
         self.accounts_view = AccountSettingsView(self.content_container, app_controller=self)
+
+        self._build_main_catalog()
+        self._build_checkout_panel()
 
         # Initial calculation & rendering
         self.recalculate_totals()
@@ -852,6 +842,7 @@ class BastaPOSApp(customtkinter.CTk):
 
         # Display target view and highlight matching button
         if view_name == "pos":
+            self.sync_products_from_management()
             self.pos_view.grid(row=0, column=0, sticky="nsew")
             self.pos_nav_btn.configure(
                 height=60, corner_radius=14,
@@ -868,6 +859,8 @@ class BastaPOSApp(customtkinter.CTk):
             )
             self.title("BASTA POS - Product Management")
         elif view_name == "stock":
+            if hasattr(self.inventory_view, "render_inventory_table"):
+                self.inventory_view.render_inventory_table()
             self.inventory_view.grid(row=0, column=0, sticky="nsew")
             self.stock_nav_btn.configure(
                 height=60, corner_radius=14,
@@ -876,6 +869,10 @@ class BastaPOSApp(customtkinter.CTk):
             )
             self.title("BASTA POS - Inventory Overview")
         elif view_name == "reports":
+            if hasattr(self.reports_view, "render_metric_cards"):
+                self.reports_view.render_metric_cards()
+            if hasattr(self.reports_view, "render_transactions_table"):
+                self.reports_view.render_transactions_table()
             self.reports_view.grid(row=0, column=0, sticky="nsew")
             self.reports_nav_btn.configure(
                 height=60, corner_radius=14,
@@ -884,6 +881,8 @@ class BastaPOSApp(customtkinter.CTk):
             )
             self.title("BASTA POS - Sales & Inventory Reports")
         elif view_name == "settings":
+            if hasattr(self.accounts_view, "render_accounts_table"):
+                self.accounts_view.render_accounts_table()
             self.accounts_view.grid(row=0, column=0, sticky="nsew")
             self.settings_nav_btn.configure(
                 height=60, corner_radius=14,
@@ -891,6 +890,78 @@ class BastaPOSApp(customtkinter.CTk):
                 font=customtkinter.CTkFont(size=12, weight="bold")
             )
             self.title("BASTA POS - Account Settings")
+
+    def sync_products_from_management(self):
+        """Dynamically synchronize POS catalog with products from Product Management."""
+        category_icons = {
+            "Burgers": "🍔",
+            "Beverages": "🥤",
+            "Drinks": "🥤",
+            "Sides": "🍟",
+            "Desserts": "🍪",
+            "Meals": "🍗",
+            "Silog": "🍳",
+            "Sandwiches": "🥪",
+            "Pasta": "🍝"
+        }
+
+        if hasattr(self, "products_view") and hasattr(self.products_view, "products_data"):
+            synced_catalog = []
+            for prod in self.products_view.products_data:
+                # Include products that are active and designated for in-store
+                if prod.get("status", "Active") == "Active" and prod.get("in_store", True):
+                    cat = prod.get("category", "Burgers")
+                    icon = category_icons.get(cat, "🍔")
+                    stock_qty = prod.get("stock", 0)
+                    synced_catalog.append({
+                        "id": prod.get("id"),
+                        "sku": prod.get("sku", ""),
+                        "name": prod.get("name", "Item"),
+                        "category": cat,
+                        "sub": f"{cat} · {stock_qty} left",
+                        "price": float(prod.get("price", 0.0)),
+                        "icon": icon,
+                        "stock": stock_qty
+                    })
+            if synced_catalog:
+                self.catalog_products = synced_catalog
+
+        if hasattr(self, "categories_bar"):
+            self.refresh_category_pills()
+        if hasattr(self, "products_scroll"):
+            self.render_product_cards()
+
+    def refresh_category_pills(self):
+        """Dynamically rebuild category pill buttons from current catalog."""
+        if not hasattr(self, "categories_bar"):
+            return
+        for widget in self.categories_bar.winfo_children():
+            widget.destroy()
+        self.category_buttons.clear()
+
+        unique_cats = sorted(list(set(p["category"] for p in self.catalog_products if p.get("category"))))
+        categories = ["🔥 All Items"] + unique_cats
+
+        if self.active_category not in categories:
+            self.active_category = "🔥 All Items"
+
+        for cat_name in categories:
+            is_active = (cat_name == self.active_category)
+            cat_btn = customtkinter.CTkButton(
+                self.categories_bar,
+                text=cat_name,
+                height=36,
+                corner_radius=18,
+                font=customtkinter.CTkFont(size=13, weight="bold" if is_active else "normal"),
+                fg_color="#18181b" if is_active else "#ffffff",
+                text_color="#ffffff" if is_active else "#334155",
+                border_width=1 if not is_active else 0,
+                border_color="#cbd5e1",
+                hover_color="#27272a" if is_active else "#f1f5f9",
+                command=lambda c=cat_name: self.select_category(c)
+            )
+            cat_btn.pack(side="left", padx=5)
+            self.category_buttons[cat_name] = cat_btn
 
     def _build_main_catalog(self):
         # Catalog container inside pos_view with smooth rounded corners and proper padding
@@ -911,7 +982,7 @@ class BastaPOSApp(customtkinter.CTk):
 
         greeting_label = customtkinter.CTkLabel(
             header_frame,
-            text="Good morning, Brian!",
+            text=f"Good morning, {self.current_user}!",
             font=customtkinter.CTkFont(size=28, weight="bold"),
             text_color="#09090b"
         )
@@ -919,7 +990,7 @@ class BastaPOSApp(customtkinter.CTk):
 
         date_label = customtkinter.CTkLabel(
             header_frame,
-            text="Monday, September 28, 2026",
+            text=datetime.now().strftime("%A, %B %d, %Y"),
             font=customtkinter.CTkFont(size=13),
             text_color="#64748b"
         )
@@ -944,7 +1015,7 @@ class BastaPOSApp(customtkinter.CTk):
 
         self.available_items_label = customtkinter.CTkLabel(
             build_info_frame,
-            text="32 items available today",
+            text="0 items available today",
             font=customtkinter.CTkFont(size=12),
             text_color="#94a3b8"
         )
@@ -964,33 +1035,13 @@ class BastaPOSApp(customtkinter.CTk):
         self.search_entry.bind("<KeyRelease>", self.on_search_change)
 
         # Category Filter Pills (Horizontal scrollable, rounded pills)
-        categories_bar = customtkinter.CTkScrollableFrame(
+        self.categories_bar = customtkinter.CTkScrollableFrame(
             self.catalog_container,
             height=52,
             orientation="horizontal",
             fg_color="transparent"
         )
-        categories_bar.grid(row=2, column=0, sticky="ew", padx=20, pady=(0, 12))
-
-        categories = ["🔥 All Items", "Burgers", "Meals", "Silog", "Sides", "Drinks"]
-
-        for cat_name in categories:
-            is_active = (cat_name == self.active_category)
-            cat_btn = customtkinter.CTkButton(
-                categories_bar,
-                text=cat_name,
-                height=36,
-                corner_radius=18,
-                font=customtkinter.CTkFont(size=13, weight="bold" if is_active else "normal"),
-                fg_color="#18181b" if is_active else "#ffffff",
-                text_color="#ffffff" if is_active else "#334155",
-                border_width=1 if not is_active else 0,
-                border_color="#cbd5e1",
-                hover_color="#27272a" if is_active else "#f1f5f9",
-                command=lambda c=cat_name: self.select_category(c)
-            )
-            cat_btn.pack(side="left", padx=5)
-            self.category_buttons[cat_name] = cat_btn
+        self.categories_bar.grid(row=2, column=0, sticky="ew", padx=20, pady=(0, 12))
 
         # Responsive Product Cards Grid
         self.products_scroll = customtkinter.CTkScrollableFrame(
@@ -998,6 +1049,9 @@ class BastaPOSApp(customtkinter.CTk):
             fg_color="transparent"
         )
         self.products_scroll.grid(row=3, column=0, sticky="nsew", padx=16, pady=(0, 16))
+
+        # Initial synchronization with Product Management
+        self.sync_products_from_management()
         self.render_product_cards()
 
     def render_product_cards(self):
@@ -1452,7 +1506,11 @@ class BastaPOSApp(customtkinter.CTk):
                 self.render_product_cards()
 
     def open_payment_complete_window(self):
-        """Open the pop-up receipt window (BastaReceiptWindow) with active order data."""
+        """Open the pop-up receipt window (BastaReceiptWindow) with active order data and process sale."""
+        if not self.cart_items:
+            print("[BASTA POS] Cannot checkout: Cart is empty.")
+            return
+
         items_list = []
         for name, info in self.cart_items.items():
             items_list.append({
@@ -1461,12 +1519,101 @@ class BastaPOSApp(customtkinter.CTk):
                 "price": info["price"]
             })
 
+        self.order_counter += 1
+        now_dt = datetime.now()
+        timestamp_str = now_dt.strftime("%m%d%H%M%S")
+        order_id = f"#B-{self.order_counter}"
+        txn_id = f"TXN-{timestamp_str}-{self.order_counter}"
+        receipt_num = f"OR-{now_dt.year}-{self.order_counter:05d}"
+        date_str = now_dt.strftime("%d %b %Y - %I:%M %p")
+        time_str = now_dt.strftime("%I:%M %p")
+
+        # 1. Deduct stock in Product Management memory & MySQL database
+        try:
+            from database import deduct_product_stock
+        except Exception:
+            try:
+                from ProjectMain.database import deduct_product_stock
+            except Exception:
+                deduct_product_stock = None
+
+        if hasattr(self, "products_view") and hasattr(self.products_view, "products_data"):
+            for item in items_list:
+                item_name = item["name"]
+                item_qty = item["qty"]
+                for p in self.products_view.products_data:
+                    if p.get("name") == item_name:
+                        current_stk = p.get("stock", 0)
+                        p["stock"] = max(0, current_stk - item_qty)
+                        break
+                if deduct_product_stock:
+                    try:
+                        deduct_product_stock(item_name, item_qty)
+                    except Exception as err:
+                        print(f"[BASTA POS] Deduct stock notice: {err}")
+
+            # Refresh product management drawer and list if currently viewed
+            if hasattr(self.products_view, "populate_drawer") and self.products_view.selected_product:
+                self.products_view.populate_drawer(self.products_view.selected_product)
+            if hasattr(self.products_view, "render_product_list"):
+                self.products_view.render_product_list()
+
+        # 2. Record Completed Transaction in Reports
+        items_summary = ", ".join(f"{it['qty']}× {it['name']}" for it in items_list)
+        if hasattr(self, "reports_view") and hasattr(self.reports_view, "add_completed_transaction"):
+            try:
+                self.reports_view.add_completed_transaction(
+                    t_id=txn_id,
+                    ord_id=order_id,
+                    t_time=time_str,
+                    itm=items_summary,
+                    pay=self.active_payment_method,
+                    cash=self.current_user,
+                    tot_val=self.calculated_total
+                )
+            except Exception as err:
+                print(f"[BASTA POS] Reports transaction log notice: {err}")
+
+        # 3. Record transaction in MySQL database
+        try:
+            from database import record_sale_transaction
+        except Exception:
+            try:
+                from ProjectMain.database import record_sale_transaction
+            except Exception:
+                record_sale_transaction = None
+
+        if record_sale_transaction:
+            try:
+                cash_rec = 1000.0 if self.active_payment_method == "Cash" else self.calculated_total
+                chg_due = max(0.0, cash_rec - self.calculated_total)
+                record_sale_transaction(
+                    transaction_id=txn_id,
+                    order_id=order_id,
+                    table_num="Table 12",
+                    cashier_name=self.current_user,
+                    payment_method=self.active_payment_method,
+                    subtotal=self.calculated_subtotal,
+                    vat=self.calculated_vat,
+                    service_charge=self.calculated_service_charge,
+                    total=self.calculated_total,
+                    cash_received=cash_rec,
+                    change_due=chg_due,
+                    items=items_list
+                )
+            except Exception as err:
+                print(f"[BASTA POS] Sale recording notice: {err}")
+
+        # Synchronize POS product stock immediately
+        self.sync_products_from_management()
+
         order_data = {
-            "order_id": "#B-1048",
+            "order_id": order_id,
             "table_num": "Table 12",
-            "receipt_num": "OR-2026-01048",
-            "cashier_name": "Bea M.",
-            "transaction_id": "TXN-0928-001048",
+            "receipt_num": receipt_num,
+            "cashier_name": self.current_user,
+            "transaction_id": txn_id,
+            "date_str": date_str,
             "items": items_list,
             "subtotal": self.calculated_subtotal,
             "vat": self.calculated_vat,

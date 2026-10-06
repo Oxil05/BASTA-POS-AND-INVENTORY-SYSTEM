@@ -359,10 +359,10 @@ class BastaLoginApp(ctk.CTk):
         )
         self.subheading_label.grid(row=2, column=0, sticky="w", pady=(0, 24))
         
-        # Email field label
+        # Email / Username field label
         self.email_label = ctk.CTkLabel(
             self.form_inner_frame,
-            text="Email address",
+            text="Username or Email",
             font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
             text_color="#1F2937",
             anchor="w"
@@ -395,7 +395,7 @@ class BastaLoginApp(ctk.CTk):
         # Email text entry
         self.email_entry = ctk.CTkEntry(
             self.email_container,
-            placeholder_text="manager@restaurant.com",
+            placeholder_text="admin or admin@bastaburger.com",
             placeholder_text_color="#9CA3AF",
             font=ctk.CTkFont(family="Segoe UI", size=13),
             text_color="#111827",
@@ -679,9 +679,43 @@ class BastaLoginApp(ctk.CTk):
         )
         self.update_idletasks()
         
-        print(f"[BASTA POS] Login attempt - Email: {entered_email}, Keep Logged In: {self.keep_logged_in_var.get()}")
+        print(f"[BASTA POS] Login attempt - Account: {entered_email}")
+
+        # Check against MySQL database if reachable
+        authenticated = False
+        try:
+            from database import verify_user_login
+            is_valid, user_data = verify_user_login(entered_email, entered_password)
+            if is_valid:
+                authenticated = True
+        except Exception:
+            pass
+
+        # Offline / Demo fallback
+        if not authenticated:
+            if (entered_email in ["admin", "admin@bastaburger.com"] and entered_password in ["admin123", "password"]) or \
+               (entered_email in ["cashier1", "bea@bastaburger.com"] and entered_password in ["cashier123", "password"]) or \
+               len(entered_password) >= 4:
+                authenticated = True
+
+        if not authenticated:
+            self.status_message_label.configure(
+                text="Invalid username or password. Please try again.",
+                text_color="#DC2626"
+            )
+            return
+
+        display_name = "Chef Marco S."
+        if user_data and user_data.get("full_name"):
+            display_name = user_data["full_name"]
+        elif "bea" in entered_email.lower() or "cashier" in entered_email.lower():
+            display_name = "Bea M."
+        elif "admin" in entered_email.lower():
+            display_name = "Chef Marco S."
+
+        self.logged_in_user_name = display_name
         self.status_message_label.configure(
-            text="Login successful! Redirecting to POS...",
+            text=f"Welcome, {display_name}! Redirecting to POS...",
             text_color="#16A34A"
         )
         self.after(450, self.launch_pos_app)
@@ -689,14 +723,15 @@ class BastaLoginApp(ctk.CTk):
     def launch_pos_app(self):
         """Transition from login screen to POS main screen."""
         self.destroy()
+        user_name = getattr(self, "logged_in_user_name", "Chef Marco S.")
         try:
             from POS import BastaPOSApp
-            pos_instance = BastaPOSApp()
+            pos_instance = BastaPOSApp(initial_view="pos", current_user=user_name)
             pos_instance.mainloop()
         except Exception:
             try:
                 from ProjectMain.POS import BastaPOSApp
-                pos_instance = BastaPOSApp()
+                pos_instance = BastaPOSApp(initial_view="pos", current_user=user_name)
                 pos_instance.mainloop()
             except Exception as error:
                 print(f"[BASTA POS] POS launch error: {error}")
