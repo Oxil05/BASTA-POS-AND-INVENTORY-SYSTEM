@@ -7,6 +7,14 @@ using CustomTkinter and Pillow. All variables and functions strictly use snake_c
 
 import os
 import sys
+
+# Robust path handling so both root execution and ProjectMain execution work
+script_dir = os.path.dirname(os.path.abspath(__file__))
+project_root = os.path.dirname(script_dir)
+for path in [script_dir, project_root]:
+    if path not in sys.path:
+        sys.path.insert(0, path)
+
 import customtkinter as ctk
 from PIL import Image, ImageDraw
 
@@ -682,11 +690,16 @@ class BastaLoginApp(ctk.CTk):
         """Transition from login screen to POS main screen."""
         self.destroy()
         try:
-            from ProjectMain.POS import BastaPOSApp
+            from POS import BastaPOSApp
             pos_instance = BastaPOSApp()
             pos_instance.mainloop()
-        except Exception as error:
-            print(f"[BASTA POS] POS launch error: {error}")
+        except Exception:
+            try:
+                from ProjectMain.POS import BastaPOSApp
+                pos_instance = BastaPOSApp()
+                pos_instance.mainloop()
+            except Exception as error:
+                print(f"[BASTA POS] POS launch error: {error}")
 
     def show_help_dialog(self):
         """Displays support contact information."""

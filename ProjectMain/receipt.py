@@ -7,17 +7,23 @@ All variables and functions strictly use snake_case.
 """
 
 import os
+import sys
 from datetime import datetime
 from PIL import Image
 import customtkinter
+
+# Robust path handling so both root execution and ProjectMain execution work
+script_dir = os.path.dirname(os.path.abspath(__file__))
+project_root = os.path.dirname(script_dir)
+for path in [script_dir, project_root]:
+    if path not in sys.path:
+        sys.path.insert(0, path)
 
 # Configure appearance
 customtkinter.set_appearance_mode("Light")
 customtkinter.set_default_color_theme("blue")
 
 # Path to basta_LOGO.png
-script_dir = os.path.dirname(os.path.abspath(__file__))
-project_root = os.path.dirname(script_dir)
 logo_path = os.path.join(project_root, "Designs", "basta_LOGO.png")
 
 try:

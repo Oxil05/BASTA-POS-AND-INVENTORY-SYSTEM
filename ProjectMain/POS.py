@@ -1,14 +1,21 @@
 import os
+import sys
 from PIL import Image
 import customtkinter
+
+# Robust path handling so both root execution and ProjectMain execution work
+script_dir = os.path.dirname(os.path.abspath(__file__))
+project_root = os.path.dirname(script_dir)
+for path in [script_dir, project_root]:
+    if path not in sys.path:
+        sys.path.insert(0, path)
 
 # Configure global CustomTkinter appearance
 customtkinter.set_appearance_mode("Light")
 customtkinter.set_default_color_theme("blue")
 
 # Base directory paths for assets
-base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-logo_path = os.path.join(base_dir, "Designs", "basta_LOGO.png")
+logo_path = os.path.join(project_root, "Designs", "basta_LOGO.png")
 
 # Safely load the brand logo with fallback
 try:
@@ -22,6 +29,20 @@ def get_logo_image(size=(60, 60)):
     if raw_logo_pil:
         return customtkinter.CTkImage(light_image=raw_logo_pil, dark_image=raw_logo_pil, size=size)
     return None
+
+
+# Import unified views
+try:
+    from product_management import ProductManagementView
+    from inventory_overview import InventoryOverviewView
+    from reports import ReportsView
+    from account_settings import AccountSettingsView
+except ImportError:
+    from ProjectMain.product_management import ProductManagementView
+    from ProjectMain.inventory_overview import InventoryOverviewView
+    from ProjectMain.reports import ReportsView
+    from ProjectMain.account_settings import AccountSettingsView
+
 
 
 class PaymentCompleteWindow(customtkinter.CTkToplevel):
@@ -67,7 +88,7 @@ class PaymentCompleteWindow(customtkinter.CTkToplevel):
         )
         sidebar_frame.grid(row=0, column=0, sticky="nsew")
         sidebar_frame.grid_propagate(False)
-        sidebar_frame.grid_rowconfigure(6, weight=1)
+        sidebar_frame.grid_rowconfigure(7, weight=1)
 
         # Brand / Logo Header using basta_LOGO.png
         sidebar_logo_img = get_logo_image(size=(52, 52))
@@ -118,22 +139,38 @@ class PaymentCompleteWindow(customtkinter.CTkToplevel):
             font=customtkinter.CTkFont(size=11),
             fg_color="transparent",
             text_color="#9ca3af",
-            hover_color="#1f2937"
+            hover_color="#1f2937",
+            command=self.open_products_screen
         )
         products_nav_btn.grid(row=3, column=0, padx=15, pady=6)
 
-        tx_nav_btn = customtkinter.CTkButton(
+        stock_nav_btn = customtkinter.CTkButton(
             sidebar_frame,
-            text="📊\nTxns",
+            text="📋\nStock",
             width=70,
             height=50,
             corner_radius=10,
             font=customtkinter.CTkFont(size=11),
             fg_color="transparent",
             text_color="#9ca3af",
-            hover_color="#1f2937"
+            hover_color="#1f2937",
+            command=self.open_inventory_screen
         )
-        tx_nav_btn.grid(row=4, column=0, padx=15, pady=6)
+        stock_nav_btn.grid(row=4, column=0, padx=15, pady=6)
+
+        tx_nav_btn = customtkinter.CTkButton(
+            sidebar_frame,
+            text="📊\nReports",
+            width=70,
+            height=50,
+            corner_radius=10,
+            font=customtkinter.CTkFont(size=11),
+            fg_color="transparent",
+            text_color="#9ca3af",
+            hover_color="#1f2937",
+            command=self.open_reports_screen
+        )
+        tx_nav_btn.grid(row=5, column=0, padx=15, pady=6)
 
         settings_nav_btn = customtkinter.CTkButton(
             sidebar_frame,
@@ -144,14 +181,15 @@ class PaymentCompleteWindow(customtkinter.CTkToplevel):
             font=customtkinter.CTkFont(size=11),
             fg_color="transparent",
             text_color="#9ca3af",
-            hover_color="#1f2937"
+            hover_color="#1f2937",
+            command=self.open_accounts_screen
         )
-        settings_nav_btn.grid(row=5, column=0, padx=15, pady=6)
+        settings_nav_btn.grid(row=6, column=0, padx=15, pady=6)
 
         # Logout at bottom
         logout_btn = customtkinter.CTkButton(
             sidebar_frame,
-            text="➔\nClose",
+            text="➔\nLogout",
             width=70,
             height=50,
             corner_radius=10,
@@ -159,9 +197,9 @@ class PaymentCompleteWindow(customtkinter.CTkToplevel):
             fg_color="transparent",
             text_color="#9ca3af",
             hover_color="#1f2937",
-            command=self.destroy
+            command=self.handle_logout
         )
-        logout_btn.grid(row=7, column=0, padx=15, pady=(10, 25))
+        logout_btn.grid(row=8, column=0, padx=15, pady=(10, 25))
 
     def _build_confirmation_panel(self):
         center_scroll = customtkinter.CTkScrollableFrame(
@@ -581,11 +619,12 @@ class PaymentCompleteWindow(customtkinter.CTkToplevel):
 class BastaPOSApp(customtkinter.CTk):
     """Main POS Application window recreation with full interactivity and responsiveness."""
 
-    def __init__(self):
+    def __init__(self, initial_view="pos"):
         super().__init__()
 
+        self.initial_view = initial_view
         self.title("BASTA POS")
-        self.geometry("1420x840")
+        self.geometry("1440x880")
         self.minsize(1080, 680)
 
         # Set background
@@ -624,17 +663,38 @@ class BastaPOSApp(customtkinter.CTk):
 
         # Configure root layout
         self.grid_rowconfigure(0, weight=1)
-        self.grid_columnconfigure(0, weight=0)  # Left sidebar
-        self.grid_columnconfigure(1, weight=4)  # Main order catalog
-        self.grid_columnconfigure(2, weight=2)  # Right checkout panel
+        self.grid_columnconfigure(0, weight=0)  # Left sidebar (width 110)
+        self.grid_columnconfigure(1, weight=1)  # Unified content container
 
         self._build_sidebar()
+
+        # Build Unified Content Container
+        self.content_container = customtkinter.CTkFrame(self, fg_color="transparent")
+        self.content_container.grid(row=0, column=1, sticky="nsew")
+        self.content_container.grid_rowconfigure(0, weight=1)
+        self.content_container.grid_columnconfigure(0, weight=1)
+
+        # 1. POS Register View Frame
+        self.pos_view = customtkinter.CTkFrame(self.content_container, fg_color="transparent")
+        self.pos_view.grid_rowconfigure(0, weight=1)
+        self.pos_view.grid_columnconfigure(0, weight=4)  # Main order catalog
+        self.pos_view.grid_columnconfigure(1, weight=2)  # Right checkout panel
+
         self._build_main_catalog()
         self._build_checkout_panel()
+
+        # 2. Reusable Modular Views embedded inside one system
+        self.products_view = ProductManagementView(self.content_container, app_controller=self)
+        self.inventory_view = InventoryOverviewView(self.content_container, app_controller=self)
+        self.reports_view = ReportsView(self.content_container, app_controller=self)
+        self.accounts_view = AccountSettingsView(self.content_container, app_controller=self)
 
         # Initial calculation & rendering
         self.recalculate_totals()
         self.refresh_cart_display()
+
+        # Switch to requested initial view
+        self.switch_view(self.initial_view)
 
         # Bind configure for responsive grid scaling
         self.bind("<Configure>", self.on_window_resize)
@@ -648,7 +708,7 @@ class BastaPOSApp(customtkinter.CTk):
         )
         sidebar_frame.grid(row=0, column=0, sticky="nsew")
         sidebar_frame.grid_propagate(False)
-        sidebar_frame.grid_rowconfigure(6, weight=1)
+        sidebar_frame.grid_rowconfigure(7, weight=1)
 
         # Brand / Logo Header using basta_LOGO.png
         if self.sidebar_logo_img:
@@ -675,8 +735,8 @@ class BastaPOSApp(customtkinter.CTk):
             )
             brand_label.grid(row=0, column=0, padx=10, pady=(25, 30))
 
-        # Nav items
-        pos_nav_btn = customtkinter.CTkButton(
+        # Navigation Buttons (All connected seamlessly inside one window)
+        self.pos_nav_btn = customtkinter.CTkButton(
             sidebar_frame,
             text="⊞\nPOS",
             width=70,
@@ -685,11 +745,12 @@ class BastaPOSApp(customtkinter.CTk):
             font=customtkinter.CTkFont(size=12, weight="bold"),
             fg_color="#10b981",
             text_color="#ffffff",
-            hover_color="#059669"
+            hover_color="#059669",
+            command=lambda: self.switch_view("pos")
         )
-        pos_nav_btn.grid(row=2, column=0, padx=15, pady=6)
+        self.pos_nav_btn.grid(row=2, column=0, padx=15, pady=6)
 
-        products_nav_btn = customtkinter.CTkButton(
+        self.products_nav_btn = customtkinter.CTkButton(
             sidebar_frame,
             text="📦\nProducts",
             width=70,
@@ -698,24 +759,40 @@ class BastaPOSApp(customtkinter.CTk):
             font=customtkinter.CTkFont(size=11),
             fg_color="transparent",
             text_color="#9ca3af",
-            hover_color="#1f2937"
+            hover_color="#1f2937",
+            command=lambda: self.switch_view("products")
         )
-        products_nav_btn.grid(row=3, column=0, padx=15, pady=6)
+        self.products_nav_btn.grid(row=3, column=0, padx=15, pady=6)
 
-        tx_nav_btn = customtkinter.CTkButton(
+        self.stock_nav_btn = customtkinter.CTkButton(
             sidebar_frame,
-            text="📊\nTxns",
+            text="📋\nStock",
             width=70,
             height=50,
             corner_radius=10,
             font=customtkinter.CTkFont(size=11),
             fg_color="transparent",
             text_color="#9ca3af",
-            hover_color="#1f2937"
+            hover_color="#1f2937",
+            command=lambda: self.switch_view("stock")
         )
-        tx_nav_btn.grid(row=4, column=0, padx=15, pady=6)
+        self.stock_nav_btn.grid(row=4, column=0, padx=15, pady=6)
 
-        settings_nav_btn = customtkinter.CTkButton(
+        self.reports_nav_btn = customtkinter.CTkButton(
+            sidebar_frame,
+            text="📊\nReports",
+            width=70,
+            height=50,
+            corner_radius=10,
+            font=customtkinter.CTkFont(size=11),
+            fg_color="transparent",
+            text_color="#9ca3af",
+            hover_color="#1f2937",
+            command=lambda: self.switch_view("reports")
+        )
+        self.reports_nav_btn.grid(row=5, column=0, padx=15, pady=6)
+
+        self.settings_nav_btn = customtkinter.CTkButton(
             sidebar_frame,
             text="⚙\nSettings",
             width=70,
@@ -724,14 +801,15 @@ class BastaPOSApp(customtkinter.CTk):
             font=customtkinter.CTkFont(size=11),
             fg_color="transparent",
             text_color="#9ca3af",
-            hover_color="#1f2937"
+            hover_color="#1f2937",
+            command=lambda: self.switch_view("settings")
         )
-        settings_nav_btn.grid(row=5, column=0, padx=15, pady=6)
+        self.settings_nav_btn.grid(row=6, column=0, padx=15, pady=6)
 
         # Logout at bottom
         logout_btn = customtkinter.CTkButton(
             sidebar_frame,
-            text="➔\nLog out",
+            text="➔\nLogout",
             width=70,
             height=50,
             corner_radius=10,
@@ -741,18 +819,89 @@ class BastaPOSApp(customtkinter.CTk):
             hover_color="#1f2937",
             command=self.handle_logout
         )
-        logout_btn.grid(row=7, column=0, padx=15, pady=(10, 25))
+        logout_btn.grid(row=8, column=0, padx=15, pady=(10, 25))
+
+    def switch_view(self, view_name):
+        """Switches the active view inside the main window seamlessly."""
+        self.current_view_name = view_name
+
+        # Hide all views
+        self.pos_view.grid_forget()
+        self.products_view.grid_forget()
+        self.inventory_view.grid_forget()
+        self.reports_view.grid_forget()
+        self.accounts_view.grid_forget()
+
+        # Reset all navigation buttons styling
+        nav_buttons = [
+            self.pos_nav_btn,
+            self.products_nav_btn,
+            self.stock_nav_btn,
+            self.reports_nav_btn,
+            self.settings_nav_btn
+        ]
+        for btn in nav_buttons:
+            btn.configure(
+                height=50,
+                corner_radius=10,
+                fg_color="transparent",
+                text_color="#9ca3af",
+                hover_color="#1f2937",
+                font=customtkinter.CTkFont(size=11)
+            )
+
+        # Display target view and highlight matching button
+        if view_name == "pos":
+            self.pos_view.grid(row=0, column=0, sticky="nsew")
+            self.pos_nav_btn.configure(
+                height=60, corner_radius=14,
+                fg_color="#10b981", text_color="#ffffff", hover_color="#059669",
+                font=customtkinter.CTkFont(size=12, weight="bold")
+            )
+            self.title("BASTA POS - Point of Sale")
+        elif view_name == "products":
+            self.products_view.grid(row=0, column=0, sticky="nsew")
+            self.products_nav_btn.configure(
+                height=60, corner_radius=14,
+                fg_color="#10b981", text_color="#ffffff", hover_color="#059669",
+                font=customtkinter.CTkFont(size=12, weight="bold")
+            )
+            self.title("BASTA POS - Product Management")
+        elif view_name == "stock":
+            self.inventory_view.grid(row=0, column=0, sticky="nsew")
+            self.stock_nav_btn.configure(
+                height=60, corner_radius=14,
+                fg_color="#10b981", text_color="#ffffff", hover_color="#059669",
+                font=customtkinter.CTkFont(size=12, weight="bold")
+            )
+            self.title("BASTA POS - Inventory Overview")
+        elif view_name == "reports":
+            self.reports_view.grid(row=0, column=0, sticky="nsew")
+            self.reports_nav_btn.configure(
+                height=60, corner_radius=14,
+                fg_color="#10b981", text_color="#ffffff", hover_color="#059669",
+                font=customtkinter.CTkFont(size=12, weight="bold")
+            )
+            self.title("BASTA POS - Sales & Inventory Reports")
+        elif view_name == "settings":
+            self.accounts_view.grid(row=0, column=0, sticky="nsew")
+            self.settings_nav_btn.configure(
+                height=60, corner_radius=14,
+                fg_color="#10b981", text_color="#ffffff", hover_color="#059669",
+                font=customtkinter.CTkFont(size=12, weight="bold")
+            )
+            self.title("BASTA POS - Account Settings")
 
     def _build_main_catalog(self):
-        # Catalog container with smooth rounded corners and proper padding
+        # Catalog container inside pos_view with smooth rounded corners and proper padding
         self.catalog_container = customtkinter.CTkFrame(
-            self,
+            self.pos_view,
             fg_color="#f8fafc",
             corner_radius=20,
             border_width=1,
             border_color="#e2e8f0"
         )
-        self.catalog_container.grid(row=0, column=1, sticky="nsew", padx=(16, 12), pady=18)
+        self.catalog_container.grid(row=0, column=0, sticky="nsew", padx=(16, 12), pady=18)
         self.catalog_container.grid_rowconfigure(3, weight=1)
         self.catalog_container.grid_columnconfigure(0, weight=1)
 
@@ -969,13 +1118,13 @@ class BastaPOSApp(customtkinter.CTk):
 
     def _build_checkout_panel(self):
         self.checkout_frame = customtkinter.CTkFrame(
-            self,
+            self.pos_view,
             fg_color="#ffffff",
             corner_radius=20,
             border_width=1,
             border_color="#e2e8f0"
         )
-        self.checkout_frame.grid(row=0, column=2, sticky="nsew", padx=(0, 18), pady=18)
+        self.checkout_frame.grid(row=0, column=1, sticky="nsew", padx=(0, 18), pady=18)
         self.checkout_frame.grid_rowconfigure(1, weight=1)
         self.checkout_frame.grid_columnconfigure(0, weight=1)
 
@@ -1329,21 +1478,46 @@ class BastaPOSApp(customtkinter.CTk):
         }
 
         try:
-            from ProjectMain.receipt import BastaReceiptWindow
+            from receipt import BastaReceiptWindow
             receipt_window = BastaReceiptWindow(self, order_data=order_data)
         except Exception:
-            receipt_window = PaymentCompleteWindow(self, order_data=order_data)
+            try:
+                from ProjectMain.receipt import BastaReceiptWindow
+                receipt_window = BastaReceiptWindow(self, order_data=order_data)
+            except Exception:
+                receipt_window = PaymentCompleteWindow(self, order_data=order_data)
         receipt_window.grab_set()
+
+    def open_products_screen(self):
+        """Navigate to the Product Management view."""
+        self.switch_view("products")
+
+    def open_inventory_screen(self):
+        """Navigate to the Inventory Overview view."""
+        self.switch_view("stock")
+
+    def open_reports_screen(self):
+        """Navigate to the Sales and Inventory Reports view."""
+        self.switch_view("reports")
+
+    def open_accounts_screen(self):
+        """Navigate to the Account Settings view."""
+        self.switch_view("settings")
 
     def handle_logout(self):
         """Transition back to the login page."""
         self.destroy()
         try:
-            from ProjectMain.login import BastaLoginApp
+            from login import BastaLoginApp
             login_app = BastaLoginApp()
             login_app.mainloop()
-        except Exception as error:
-            print(f"[BASTA POS] Logout redirect error: {error}")
+        except Exception:
+            try:
+                from ProjectMain.login import BastaLoginApp
+                login_app = BastaLoginApp()
+                login_app.mainloop()
+            except Exception as error:
+                print(f"[BASTA POS] Logout redirect error: {error}")
 
 
 if __name__ == "__main__":
