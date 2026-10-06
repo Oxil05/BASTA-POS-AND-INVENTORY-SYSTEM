@@ -1077,19 +1077,37 @@ class BastaPOSApp(customtkinter.CTk):
             m_btn.grid(row=0, column=m_idx, padx=3, sticky="ew")
             self.payment_buttons[m_name] = m_btn
 
-        # Charge Button (Responsive)
+        # Action Buttons: Receipt Preview & Charge Button (Responsive)
+        action_btns_frame = customtkinter.CTkFrame(self.checkout_frame, fg_color="transparent")
+        action_btns_frame.grid(row=6, column=0, padx=18, pady=(0, 18), sticky="ew")
+        action_btns_frame.grid_columnconfigure(0, weight=1)
+        action_btns_frame.grid_columnconfigure(1, weight=2)
+
+        self.receipt_btn = customtkinter.CTkButton(
+            action_btns_frame,
+            text="🧾 Receipt",
+            height=48,
+            corner_radius=12,
+            font=customtkinter.CTkFont(size=13, weight="bold"),
+            fg_color="#18181b",
+            text_color="#ffffff",
+            hover_color="#27272a",
+            command=self.open_payment_complete_window
+        )
+        self.receipt_btn.grid(row=0, column=0, padx=(0, 6), sticky="ew")
+
         self.charge_btn = customtkinter.CTkButton(
-            self.checkout_frame,
+            action_btns_frame,
             text="➔ Charge ₱0.00",
             height=48,
             corner_radius=12,
-            font=customtkinter.CTkFont(size=15, weight="bold"),
+            font=customtkinter.CTkFont(size=14, weight="bold"),
             fg_color="#10b981",
             text_color="#ffffff",
             hover_color="#059669",
             command=self.open_payment_complete_window
         )
-        self.charge_btn.grid(row=6, column=0, padx=18, pady=(0, 18), sticky="ew")
+        self.charge_btn.grid(row=0, column=1, padx=(6, 0), sticky="ew")
 
     def add_to_cart(self, product):
         """Add product to cart or increment quantity."""
@@ -1285,8 +1303,7 @@ class BastaPOSApp(customtkinter.CTk):
                 self.render_product_cards()
 
     def open_payment_complete_window(self):
-        """Open the secondary Payment Complete & Tablet Receipt window with active order data."""
-        # Convert cart items to list format
+        """Open the pop-up receipt window (BastaReceiptWindow) with active order data."""
         items_list = []
         for name, info in self.cart_items.items():
             items_list.append({
@@ -1296,16 +1313,27 @@ class BastaPOSApp(customtkinter.CTk):
             })
 
         order_data = {
+            "order_id": "#B-1048",
+            "table_num": "Table 12",
+            "receipt_num": "OR-2026-01048",
+            "cashier_name": "Bea M.",
+            "transaction_id": "TXN-0928-001048",
             "items": items_list,
             "subtotal": self.calculated_subtotal,
             "vat": self.calculated_vat,
             "service_charge": self.calculated_service_charge,
             "total": self.calculated_total,
-            "payment_method": self.active_payment_method
+            "payment_method": self.active_payment_method,
+            "cash_received": 1000.0 if self.active_payment_method == "Cash" else self.calculated_total,
+            "change_due": max(0.0, (1000.0 if self.active_payment_method == "Cash" else self.calculated_total) - self.calculated_total)
         }
 
-        payment_window = PaymentCompleteWindow(self, order_data=order_data)
-        payment_window.grab_set()
+        try:
+            from ProjectMain.receipt import BastaReceiptWindow
+            receipt_window = BastaReceiptWindow(self, order_data=order_data)
+        except Exception:
+            receipt_window = PaymentCompleteWindow(self, order_data=order_data)
+        receipt_window.grab_set()
 
     def handle_logout(self):
         """Transition back to the login page."""
