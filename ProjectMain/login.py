@@ -15,8 +15,45 @@ for path in [script_dir, project_root]:
     if path not in sys.path:
         sys.path.insert(0, path)
 
+import time
 import customtkinter as ctk
 from PIL import Image, ImageDraw
+
+# Registered user accounts for validation and offline fallback
+# Maps lowercase username and email to (password, display_name, role)
+DEFAULT_REGISTERED_USERS = {
+    # Administrator (Main Chef)
+    "admin": ("admin123", "Chef Marco Santos", "Administrator"),
+    "admin@bastaburger.com": ("admin123", "Chef Marco Santos", "Administrator"),
+    "marco_admin": ("admin123", "Chef Marco Santos", "Administrator"),
+    "marco.s@bastaburger.ph": ("admin123", "Chef Marco Santos", "Administrator"),
+
+    # Cashier 1
+    "cashier1": ("cashier123", "Bea Mendoza", "Cashier"),
+    "bea@bastaburger.com": ("cashier123", "Bea Mendoza", "Cashier"),
+    "bea_cashier": ("cashier123", "Bea Mendoza", "Cashier"),
+    "bea.m@bastaburger.ph": ("cashier123", "Bea Mendoza", "Cashier"),
+
+    # Shift Supervisor
+    "supervisor": ("super123", "Danilo Reyes", "Shift Supervisor"),
+    "danilo@bastaburger.com": ("super123", "Danilo Reyes", "Shift Supervisor"),
+    "dan_shift": ("super123", "Danilo Reyes", "Shift Supervisor"),
+    "danilo.r@bastaburger.ph": ("super123", "Danilo Reyes", "Shift Supervisor"),
+
+    # Inventory Manager
+    "inventory1": ("inv123", "Aris Pangilinan", "Inventory Manager"),
+    "aris@bastaburger.com": ("inv123", "Aris Pangilinan", "Inventory Manager"),
+    "aris_stock": ("inv123", "Aris Pangilinan", "Inventory Manager"),
+    "aris.p@bastaburger.ph": ("inv123", "Aris Pangilinan", "Inventory Manager"),
+
+    # Cashier 2
+    "chloe_pos": ("cashier123", "Chloe Villanueva", "Cashier"),
+    "chloe.v@bastaburger.ph": ("cashier123", "Chloe Villanueva", "Cashier"),
+
+    # Admin 2
+    "raf_d": ("admin123", "Rafael Dizon", "Administrator"),
+    "rafael.d@bastaburger.ph": ("admin123", "Rafael Dizon", "Administrator"),
+}
 
 
 def find_logo_path() -> str:
@@ -257,6 +294,8 @@ class BastaLoginApp(ctk.CTk):
         self.is_password_visible = False
         self.keep_logged_in_var = ctk.BooleanVar(value=True)
         self.last_badge_size = 520
+        self.failed_attempts = 0
+        self.lockout_until = 0.0
         
         # Configure grid layout: 50% left (form), 50% right (hero)
         self.grid_rowconfigure(0, weight=1)
@@ -662,17 +701,42 @@ class BastaLoginApp(ctk.CTk):
             self.is_password_visible = True
 
     def handle_login(self):
-        """Validates credentials, provides feedback, and redirects to POS."""
+        """Validates credentials with strict constraints, provides feedback, and redirects to POS."""
+        current_time = time.time()
+        if self.lockout_until > current_time:
+            remaining_seconds = int(self.lockout_until - current_time) + 1
+            self.status_message_label.configure(
+                text=f"Too many failed attempts. Locked for {remaining_seconds}s.",
+                text_color="#DC2626"
+            )
+            return
+
         entered_email = self.email_entry.get().strip()
         entered_password = self.password_entry.get().strip()
         
+        # 1. Non-empty constraint
         if not entered_email or not entered_password:
             self.status_message_label.configure(
-                text="Please enter both email and password.",
+                text="Please enter both username/email and password.",
                 text_color="#DC2626"
             )
             return
             
+        # 2. Minimum length constraints
+        if len(entered_email) < 3:
+            self.status_message_label.configure(
+                text="Username or email must be at least 3 characters.",
+                text_color="#DC2626"
+            )
+            return
+
+        if len(entered_password) < 4:
+            self.status_message_label.configure(
+                text="Password must be at least 4 characters.",
+                text_color="#DC2626"
+            )
+            return
+
         self.status_message_label.configure(
             text="Authenticating...",
             text_color="#2563EB"
@@ -681,41 +745,56 @@ class BastaLoginApp(ctk.CTk):
         
         print(f"[BASTA POS] Login attempt - Account: {entered_email}")
 
-        # Check against MySQL database if reachable
         authenticated = False
+        display_name = None
+        user_role = None
+
+        # 3. Primary Authentication Check against MySQL database
         try:
             from database import verify_user_login
             is_valid, user_data = verify_user_login(entered_email, entered_password)
-            if is_valid:
+            if is_valid and user_data:
                 authenticated = True
-        except Exception:
-            pass
+                display_name = user_data.get("full_name") or user_data.get("username")
+                user_role = user_data.get("role") or "Staff"
+        except Exception as err:
+            print(f"[BASTA DB] Database auth notice: {err}")
 
-        # Offline / Demo fallback
+        # 4. Strict Registered Accounts Fallback (Exact username/email and password match only)
         if not authenticated:
-            if (entered_email in ["admin", "admin@bastaburger.com"] and entered_password in ["admin123", "password"]) or \
-               (entered_email in ["cashier1", "bea@bastaburger.com"] and entered_password in ["cashier123", "password"]) or \
-               len(entered_password) >= 4:
-                authenticated = True
+            normalized_key = entered_email.lower()
+            if normalized_key in DEFAULT_REGISTERED_USERS:
+                expected_password, expected_name, expected_role = DEFAULT_REGISTERED_USERS[normalized_key]
+                if entered_password == expected_password:
+                    authenticated = True
+                    display_name = expected_name
+                    user_role = expected_role
 
+        # 5. Strict Failure Handling & Lockout Constraint
         if not authenticated:
-            self.status_message_label.configure(
-                text="Invalid username or password. Please try again.",
-                text_color="#DC2626"
-            )
+            self.failed_attempts += 1
+            if self.failed_attempts >= 5:
+                self.lockout_until = time.time() + 30.0  # 30-second lockout
+                self.status_message_label.configure(
+                    text="Too many failed attempts. Account locked for 30 seconds.",
+                    text_color="#DC2626"
+                )
+            else:
+                attempts_left = 5 - self.failed_attempts
+                self.status_message_label.configure(
+                    text=f"Invalid username or password. ({attempts_left} attempts left)",
+                    text_color="#DC2626"
+                )
             return
 
-        display_name = "Chef Marco S."
-        if user_data and user_data.get("full_name"):
-            display_name = user_data["full_name"]
-        elif "bea" in entered_email.lower() or "cashier" in entered_email.lower():
-            display_name = "Bea M."
-        elif "admin" in entered_email.lower():
-            display_name = "Chef Marco S."
-
+        # 6. Success: Reset security counters & proceed
+        self.failed_attempts = 0
+        self.lockout_until = 0.0
         self.logged_in_user_name = display_name
+        self.logged_in_role = user_role
+
         self.status_message_label.configure(
-            text=f"Welcome, {display_name}! Redirecting to POS...",
+            text=f"Welcome, {display_name} ({user_role})! Redirecting...",
             text_color="#16A34A"
         )
         self.after(450, self.launch_pos_app)
@@ -723,7 +802,7 @@ class BastaLoginApp(ctk.CTk):
     def launch_pos_app(self):
         """Transition from login screen to POS main screen."""
         self.destroy()
-        user_name = getattr(self, "logged_in_user_name", "Chef Marco S.")
+        user_name = getattr(self, "logged_in_user_name", "Chef Marco Santos")
         try:
             from POS import BastaPOSApp
             pos_instance = BastaPOSApp(initial_view="pos", current_user=user_name)
@@ -737,9 +816,9 @@ class BastaLoginApp(ctk.CTk):
                 print(f"[BASTA POS] POS launch error: {error}")
 
     def show_help_dialog(self):
-        """Displays support contact information."""
+        """Displays support contact information and demo credentials."""
         self.status_message_label.configure(
-            text="Support: Contact support@bastaburger.com or call +63 (2) 8888-BASTA",
+            text="Admin: admin / admin123  |  Cashier: cashier1 / cashier123",
             text_color="#4B5563"
         )
 
