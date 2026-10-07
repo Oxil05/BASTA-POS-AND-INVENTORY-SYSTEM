@@ -285,13 +285,14 @@ class AccountSettingsView(customtkinter.CTkFrame):
             f_name = entries["Full Name:"].get().strip()
             u_name = entries["Username:"].get().strip()
             email = entries["Email Address:"].get().strip()
+            pwd = entries["Temporary Password:"].get().strip() or "staff123"
             sel_role = role_cb.get()
 
             if f_name and u_name:
                 new_id = len(self.accounts) + 1
                 try:
                     from database import add_user
-                    db_id = add_user(u_name, "staff123", f_name, email or f"{u_name}@bastaburger.ph", sel_role, "Active")
+                    db_id = add_user(u_name, pwd, f_name, email or f"{u_name}@bastaburger.ph", sel_role, "Active")
                     if db_id:
                         new_id = db_id
                 except Exception as e:

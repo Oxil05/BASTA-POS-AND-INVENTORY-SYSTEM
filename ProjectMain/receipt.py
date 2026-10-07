@@ -616,6 +616,18 @@ class BastaReceiptWindow(customtkinter.CTkToplevel):
             self.parent_window.reset_cart()
         self.destroy()
 
+    def destroy(self):
+        """Safely cancels all pending Tcl after callbacks before destruction."""
+        try:
+            for after_id in self.tk.call("after", "info"):
+                try:
+                    self.after_cancel(after_id)
+                except Exception:
+                    pass
+        except Exception:
+            pass
+        super().destroy()
+
     def handle_print_receipt(self):
         """Simulate receipt printing feedback."""
         print("[BASTA POS] Printing receipt...")

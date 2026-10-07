@@ -4,25 +4,30 @@ Database Connection and Initialization Module (XAMPP MySQL)
 All variables and functions strictly use snake_case.
 """
 
+import os
 import sys
 import mysql.connector
 from mysql.connector import Error
 
-# Default XAMPP MySQL Configuration
+# Default XAMPP MySQL Configuration (can be overridden via environment variables or edited directly)
 DEFAULT_DB_CONFIG = {
-    "host": "localhost",
-    "user": "root",
-    "password": "",
-    "port": 3306,
-    "database": "basta_pos"
+    "host": os.environ.get("BASTA_DB_HOST", "localhost"),
+    "user": os.environ.get("BASTA_DB_USER", "root"),
+    "password": os.environ.get("BASTA_DB_PASSWORD", ""),
+    "port": int(os.environ.get("BASTA_DB_PORT", 3306)),
+    "database": os.environ.get("BASTA_DB_NAME", "basta_pos")
 }
+
+_is_auto_initializing = False
 
 
 def get_db_connection(use_database=True):
     """
     Establishes and returns a connection to the MySQL server (XAMPP).
     If use_database is False, connects to the server without selecting a database.
+    If database 'basta_pos' doesn't exist yet (errno 1049), automatically initializes it.
     """
+    global _is_auto_initializing
     config = DEFAULT_DB_CONFIG.copy()
     if not use_database:
         config.pop("database", None)
@@ -31,8 +36,21 @@ def get_db_connection(use_database=True):
         connection = mysql.connector.connect(**config)
         return connection
     except Error as err:
+        # Detect MySQL error 1049: Unknown database 'basta_pos'
+        if use_database and not _is_auto_initializing and getattr(err, "errno", None) == 1049:
+            print("\n[BASTA DB] Database 'basta_pos' does not exist yet.")
+            print("[BASTA DB] Automatically initializing database and tables now...")
+            _is_auto_initializing = True
+            try:
+                if initialize_database():
+                    return mysql.connector.connect(**config)
+            except Exception as auto_init_err:
+                print(f"[BASTA DB] Auto-initialization encountered an error: {auto_init_err}")
+            finally:
+                _is_auto_initializing = False
         print(f"[BASTA DB] Connection error: {err}")
         return None
+
 
 
 def initialize_database():
@@ -281,26 +299,54 @@ def fetch_all_users():
 
 def verify_user_login(username, password):
     """
-    Validates user credentials against the MySQL database.
-    Returns (True, user_dict) or (False, None).
+    Validates user credentials directly against the MySQL database.
+    Returns (True, user_dict) on success, or (False, error_reason).
+    error_reason can be: 'DB_CONNECTION_ERROR', 'USER_NOT_FOUND', 'INVALID_PASSWORD', 'ACCOUNT_INACTIVE'
     """
     conn = get_db_connection()
     if not conn:
-        return False, None
+        return False, "DB_CONNECTION_ERROR"
     try:
         cursor = conn.cursor(dictionary=True)
+        # Search by username or email
         cursor.execute(
-            "SELECT * FROM `users` WHERE (`username` = %s OR `email` = %s) AND `password_hash` = %s AND `status` = 'Active' LIMIT 1;",
-            (username, username, password)
+            "SELECT * FROM `users` WHERE `username` = %s OR `email` = %s LIMIT 1;",
+            (username, username)
         )
         user = cursor.fetchone()
+        if not user:
+            cursor.close()
+            conn.close()
+            return False, "USER_NOT_FOUND"
+
+        if user.get("status") != "Active":
+            cursor.close()
+            conn.close()
+            return False, "ACCOUNT_INACTIVE"
+
+        if str(user.get("password_hash")) != str(password):
+            cursor.close()
+            conn.close()
+            return False, "INVALID_PASSWORD"
+
+        # Update last_login timestamp upon successful authentication
+        try:
+            update_cursor = conn.cursor()
+            update_cursor.execute(
+                "UPDATE `users` SET `last_login` = NOW() WHERE `id` = %s;",
+                (user["id"],)
+            )
+            conn.commit()
+            update_cursor.close()
+        except Exception:
+            pass
+
         cursor.close()
         conn.close()
-        if user:
-            return True, user
-        return False, None
-    except Exception:
-        return False, None
+        return True, user
+    except Exception as err:
+        print(f"[BASTA DB] Auth query error: {err}")
+        return False, "QUERY_ERROR"
 
 
 # --- PRODUCT DATA MANIPULATION (CRUD) ---

@@ -19,42 +19,6 @@ import time
 import customtkinter as ctk
 from PIL import Image, ImageDraw
 
-# Registered user accounts for validation and offline fallback
-# Maps lowercase username and email to (password, display_name, role)
-DEFAULT_REGISTERED_USERS = {
-    # Administrator (Main Chef)
-    "admin": ("admin123", "Chef Marco Santos", "Administrator"),
-    "admin@bastaburger.com": ("admin123", "Chef Marco Santos", "Administrator"),
-    "marco_admin": ("admin123", "Chef Marco Santos", "Administrator"),
-    "marco.s@bastaburger.ph": ("admin123", "Chef Marco Santos", "Administrator"),
-
-    # Cashier 1
-    "cashier1": ("cashier123", "Bea Mendoza", "Cashier"),
-    "bea@bastaburger.com": ("cashier123", "Bea Mendoza", "Cashier"),
-    "bea_cashier": ("cashier123", "Bea Mendoza", "Cashier"),
-    "bea.m@bastaburger.ph": ("cashier123", "Bea Mendoza", "Cashier"),
-
-    # Shift Supervisor
-    "supervisor": ("super123", "Danilo Reyes", "Shift Supervisor"),
-    "danilo@bastaburger.com": ("super123", "Danilo Reyes", "Shift Supervisor"),
-    "dan_shift": ("super123", "Danilo Reyes", "Shift Supervisor"),
-    "danilo.r@bastaburger.ph": ("super123", "Danilo Reyes", "Shift Supervisor"),
-
-    # Inventory Manager
-    "inventory1": ("inv123", "Aris Pangilinan", "Inventory Manager"),
-    "aris@bastaburger.com": ("inv123", "Aris Pangilinan", "Inventory Manager"),
-    "aris_stock": ("inv123", "Aris Pangilinan", "Inventory Manager"),
-    "aris.p@bastaburger.ph": ("inv123", "Aris Pangilinan", "Inventory Manager"),
-
-    # Cashier 2
-    "chloe_pos": ("cashier123", "Chloe Villanueva", "Cashier"),
-    "chloe.v@bastaburger.ph": ("cashier123", "Chloe Villanueva", "Cashier"),
-
-    # Admin 2
-    "raf_d": ("admin123", "Rafael Dizon", "Administrator"),
-    "rafael.d@bastaburger.ph": ("admin123", "Rafael Dizon", "Administrator"),
-}
-
 
 def find_logo_path() -> str:
     """Locates the basta_LOGO.png file across common execution contexts."""
@@ -738,40 +702,42 @@ class BastaLoginApp(ctk.CTk):
             return
 
         self.status_message_label.configure(
-            text="Authenticating...",
+            text="Verifying credentials with database...",
             text_color="#2563EB"
         )
         self.update_idletasks()
         
-        print(f"[BASTA POS] Login attempt - Account: {entered_email}")
+        print(f"[BASTA POS] Database login verification - Account: {entered_email}")
 
-        authenticated = False
-        display_name = None
-        user_role = None
-
-        # 3. Primary Authentication Check against MySQL database
+        # 3. Direct MySQL Database Authentication
+        is_valid = False
+        user_data = None
         try:
             from database import verify_user_login
             is_valid, user_data = verify_user_login(entered_email, entered_password)
-            if is_valid and user_data:
-                authenticated = True
-                display_name = user_data.get("full_name") or user_data.get("username")
-                user_role = user_data.get("role") or "Staff"
         except Exception as err:
-            print(f"[BASTA DB] Database auth notice: {err}")
+            print(f"[BASTA DB] Auth query exception: {err}")
+            is_valid = False
+            user_data = "DB_CONNECTION_ERROR"
 
-        # 4. Strict Registered Accounts Fallback (Exact username/email and password match only)
-        if not authenticated:
-            normalized_key = entered_email.lower()
-            if normalized_key in DEFAULT_REGISTERED_USERS:
-                expected_password, expected_name, expected_role = DEFAULT_REGISTERED_USERS[normalized_key]
-                if entered_password == expected_password:
-                    authenticated = True
-                    display_name = expected_name
-                    user_role = expected_role
+        # 4. Handle Database Connection Failure
+        if not is_valid and user_data == "DB_CONNECTION_ERROR":
+            self.status_message_label.configure(
+                text="Cannot connect to database. Please make sure MySQL is running in XAMPP.",
+                text_color="#DC2626"
+            )
+            return
 
-        # 5. Strict Failure Handling & Lockout Constraint
-        if not authenticated:
+        # 5. Handle Inactive Account
+        if not is_valid and user_data == "ACCOUNT_INACTIVE":
+            self.status_message_label.configure(
+                text="This account is deactivated. Please contact an administrator.",
+                text_color="#DC2626"
+            )
+            return
+
+        # 6. Handle Invalid Credentials with Lockout Counter
+        if not is_valid or not isinstance(user_data, dict):
             self.failed_attempts += 1
             if self.failed_attempts >= 5:
                 self.lockout_until = time.time() + 30.0  # 30-second lockout
@@ -787,9 +753,13 @@ class BastaLoginApp(ctk.CTk):
                 )
             return
 
-        # 6. Success: Reset security counters & proceed
+        # 7. Authentication Succeeded: Retrieve identity directly from database record
         self.failed_attempts = 0
         self.lockout_until = 0.0
+        
+        display_name = user_data.get("full_name") or user_data.get("username") or "Staff Member"
+        user_role = user_data.get("role") or "Staff"
+
         self.logged_in_user_name = display_name
         self.logged_in_role = user_role
 
@@ -799,10 +769,22 @@ class BastaLoginApp(ctk.CTk):
         )
         self.after(450, self.launch_pos_app)
 
+    def destroy(self):
+        """Safely cancels all pending Tcl after callbacks before destruction to prevent Tcl script errors."""
+        try:
+            for after_id in self.tk.call("after", "info"):
+                try:
+                    self.after_cancel(after_id)
+                except Exception:
+                    pass
+        except Exception:
+            pass
+        super().destroy()
+
     def launch_pos_app(self):
         """Transition from login screen to POS main screen."""
-        self.destroy()
         user_name = getattr(self, "logged_in_user_name", "Chef Marco Santos")
+        self.destroy()
         try:
             from POS import BastaPOSApp
             pos_instance = BastaPOSApp(initial_view="pos", current_user=user_name)
@@ -816,9 +798,9 @@ class BastaLoginApp(ctk.CTk):
                 print(f"[BASTA POS] POS launch error: {error}")
 
     def show_help_dialog(self):
-        """Displays support contact information and demo credentials."""
+        """Displays support contact information and database setup hint."""
         self.status_message_label.configure(
-            text="Admin: admin / admin123  |  Cashier: cashier1 / cashier123",
+            text="Credentials are verified against MySQL database. Run 'python ProjectMain/database.py' to initialize.",
             text_color="#4B5563"
         )
 

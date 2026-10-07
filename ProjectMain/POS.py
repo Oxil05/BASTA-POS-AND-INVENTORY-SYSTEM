@@ -1651,6 +1651,18 @@ class BastaPOSApp(customtkinter.CTk):
         """Navigate to the Account Settings view."""
         self.switch_view("settings")
 
+    def destroy(self):
+        """Safely cancels all pending Tcl after callbacks before destruction to prevent Tcl script errors."""
+        try:
+            for after_id in self.tk.call("after", "info"):
+                try:
+                    self.after_cancel(after_id)
+                except Exception:
+                    pass
+        except Exception:
+            pass
+        super().destroy()
+
     def handle_logout(self):
         """Transition back to the login page."""
         self.destroy()
