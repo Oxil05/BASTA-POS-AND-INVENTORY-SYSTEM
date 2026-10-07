@@ -287,8 +287,8 @@ class PaymentCompleteWindow(customtkinter.CTkToplevel):
         card_frame.grid_columnconfigure(1, weight=1)
 
         pay_method = self.order_data.get("payment_method", "Cash")
-        cash_received = 1000.0 if pay_method == "Cash" else total_amount
-        change_due = max(0.0, cash_received - total_amount)
+        cash_received = self.order_data.get("cash_received", (1000.0 if pay_method == "Cash" else total_amount))
+        change_due = self.order_data.get("change_due", max(0.0, cash_received - total_amount))
 
         detail_items = [
             ("Payment method", pay_method),
@@ -581,8 +581,8 @@ class PaymentCompleteWindow(customtkinter.CTkToplevel):
         badge_frame.grid_columnconfigure(1, weight=1)
 
         pay_method = self.order_data.get("payment_method", "Cash")
-        cash_received = 1000.0 if pay_method == "Cash" else total_val
-        change_due = max(0.0, cash_received - total_val)
+        cash_received = self.order_data.get("cash_received", (1000.0 if pay_method == "Cash" else total_val))
+        change_due = self.order_data.get("change_due", max(0.0, cash_received - total_val))
 
         b_cash = customtkinter.CTkLabel(
             badge_frame,
@@ -615,6 +615,26 @@ class PaymentCompleteWindow(customtkinter.CTkToplevel):
         if hasattr(self.parent_window, "reset_cart"):
             self.parent_window.reset_cart()
         self.destroy()
+
+    def open_products_screen(self):
+        self.destroy()
+        if hasattr(self.parent_window, "switch_view"):
+            self.parent_window.switch_view("products")
+
+    def open_inventory_screen(self):
+        self.destroy()
+        if hasattr(self.parent_window, "switch_view"):
+            self.parent_window.switch_view("inventory")
+
+    def open_reports_screen(self):
+        self.destroy()
+        if hasattr(self.parent_window, "switch_view"):
+            self.parent_window.switch_view("reports")
+
+    def open_accounts_screen(self):
+        self.destroy()
+        if hasattr(self.parent_window, "switch_view"):
+            self.parent_window.switch_view("settings")
 
 
 class BastaPOSApp(customtkinter.CTk):
@@ -1280,9 +1300,103 @@ class BastaPOSApp(customtkinter.CTk):
             m_btn.grid(row=0, column=m_idx, padx=3, sticky="ew")
             self.payment_buttons[m_name] = m_btn
 
-        # Action Buttons: Receipt Preview & Charge Button (Responsive)
+        # Row 6: Cash Tendered & Change Section (Responsive)
+        self.cash_tender_frame = customtkinter.CTkFrame(
+            self.checkout_frame,
+            fg_color="#f8fafc",
+            corner_radius=12,
+            border_width=1,
+            border_color="#e2e8f0"
+        )
+        self.cash_tender_frame.grid(row=6, column=0, padx=18, pady=(0, 12), sticky="ew")
+
+        # Header: Title & Change Due Badge
+        tender_header = customtkinter.CTkFrame(self.cash_tender_frame, fg_color="transparent")
+        tender_header.pack(fill="x", padx=12, pady=(10, 4))
+        tender_header.grid_columnconfigure(0, weight=1)
+
+        self.cash_tender_title = customtkinter.CTkLabel(
+            tender_header,
+            text="💵 Cash Given by Customer:",
+            font=customtkinter.CTkFont(size=12, weight="bold"),
+            text_color="#334155"
+        )
+        self.cash_tender_title.grid(row=0, column=0, sticky="w")
+
+        self.change_due_label = customtkinter.CTkLabel(
+            tender_header,
+            text="Change: ₱0.00",
+            font=customtkinter.CTkFont(size=12, weight="bold"),
+            text_color="#059669"
+        )
+        self.change_due_label.grid(row=0, column=1, sticky="e")
+
+        # Cash Input Box & Exact Button Row
+        self.cash_input_row = customtkinter.CTkFrame(self.cash_tender_frame, fg_color="transparent")
+        self.cash_input_row.pack(fill="x", padx=12, pady=(0, 6))
+        self.cash_input_row.grid_columnconfigure(0, weight=1)
+
+        self.cash_tendered_entry = customtkinter.CTkEntry(
+            self.cash_input_row,
+            placeholder_text="Enter cash (e.g. 1000)",
+            height=36,
+            corner_radius=8,
+            fg_color="#ffffff",
+            border_color="#cbd5e1",
+            font=customtkinter.CTkFont(size=13, weight="bold")
+        )
+        self.cash_tendered_entry.grid(row=0, column=0, sticky="ew", padx=(0, 6))
+        self.cash_tendered_entry.bind("<KeyRelease>", self.on_cash_tendered_change)
+        self.cash_tendered_entry.bind("<Return>", lambda e: self.open_payment_complete_window())
+
+        self.exact_cash_btn = customtkinter.CTkButton(
+            self.cash_input_row,
+            text="Exact",
+            width=54,
+            height=36,
+            corner_radius=8,
+            font=customtkinter.CTkFont(size=12, weight="bold"),
+            fg_color="#e2e8f0",
+            text_color="#0f172a",
+            hover_color="#cbd5e1",
+            command=self.set_exact_cash
+        )
+        self.exact_cash_btn.grid(row=0, column=1, sticky="e")
+
+        # Quick Denomination Presets Row
+        self.presets_row = customtkinter.CTkFrame(self.cash_tender_frame, fg_color="transparent")
+        self.presets_row.pack(fill="x", padx=12, pady=(0, 10))
+        for p_idx in range(4):
+            self.presets_row.grid_columnconfigure(p_idx, weight=1)
+
+        preset_denominations = [100, 200, 500, 1000]
+        for p_idx, p_val in enumerate(preset_denominations):
+            p_btn = customtkinter.CTkButton(
+                self.presets_row,
+                text=f"₱{p_val:,}",
+                height=26,
+                corner_radius=6,
+                font=customtkinter.CTkFont(size=11, weight="bold"),
+                fg_color="#ffffff",
+                border_width=1,
+                border_color="#e2e8f0",
+                text_color="#475569",
+                hover_color="#f1f5f9",
+                command=lambda val=p_val: self.set_preset_cash(val)
+            )
+            p_btn.grid(row=0, column=p_idx, padx=2, sticky="ew")
+
+        # Digital Payment Info Label (shown when GCash or Card is active)
+        self.digital_pay_info_lbl = customtkinter.CTkLabel(
+            self.cash_tender_frame,
+            text="📱 Digital Payment: Exact charge will be billed.",
+            font=customtkinter.CTkFont(size=12),
+            text_color="#64748b"
+        )
+
+        # Row 7: Action Buttons: Receipt Preview & Charge Button (Responsive)
         action_btns_frame = customtkinter.CTkFrame(self.checkout_frame, fg_color="transparent")
-        action_btns_frame.grid(row=6, column=0, padx=18, pady=(0, 18), sticky="ew")
+        action_btns_frame.grid(row=7, column=0, padx=18, pady=(0, 18), sticky="ew")
         action_btns_frame.grid_columnconfigure(0, weight=1)
         action_btns_frame.grid_columnconfigure(1, weight=2)
 
@@ -1343,8 +1457,12 @@ class BastaPOSApp(customtkinter.CTk):
             self.refresh_cart_display()
 
     def reset_cart(self):
-        """Reset the cart to empty."""
+        """Reset the cart to empty and clear cash input."""
         self.cart_items.clear()
+        if hasattr(self, "cash_tendered_entry"):
+            self.cash_tendered_entry.delete(0, "end")
+        if hasattr(self, "change_due_label"):
+            self.change_due_label.configure(text="Change: ₱0.00", text_color="#059669")
         self.recalculate_totals()
         self.refresh_cart_display()
 
@@ -1369,6 +1487,9 @@ class BastaPOSApp(customtkinter.CTk):
         self.service_charge_label.configure(text=f"₱{service_charge:,.2f}")
         self.tot_price_label.configure(text=f"₱{total:,.2f}")
         self.charge_btn.configure(text=f"➔ Charge ₱{total:,.2f}")
+
+        if hasattr(self, "cash_tendered_entry"):
+            self.on_cash_tendered_change()
 
     def refresh_cart_display(self):
         """Re-render the items in checkout order_scroll."""
@@ -1473,7 +1594,7 @@ class BastaPOSApp(customtkinter.CTk):
         self.render_product_cards()
 
     def select_payment_method(self, method_name):
-        """Highlight chosen payment method."""
+        """Highlight chosen payment method and adapt cash/digital payment view."""
         self.active_payment_method = method_name
         for name, btn in self.payment_buttons.items():
             is_act = (name == method_name)
@@ -1483,6 +1604,87 @@ class BastaPOSApp(customtkinter.CTk):
                 font=customtkinter.CTkFont(size=12, weight="bold" if is_act else "normal"),
                 border_width=0 if is_act else 1
             )
+
+        if hasattr(self, "cash_tender_frame"):
+            if method_name == "Cash":
+                self.digital_pay_info_lbl.pack_forget()
+                self.cash_input_row.pack(fill="x", padx=12, pady=(0, 6))
+                self.presets_row.pack(fill="x", padx=12, pady=(0, 10))
+                self.cash_tender_title.configure(text="💵 Cash Given by Customer:")
+                self.on_cash_tendered_change()
+            else:
+                self.cash_input_row.pack_forget()
+                self.presets_row.pack_forget()
+                self.digital_pay_info_lbl.pack(fill="x", padx=12, pady=(4, 10))
+                icon = "📱" if method_name == "GCash" else "💳"
+                self.cash_tender_title.configure(text=f"{icon} {method_name} Selected:")
+                self.digital_pay_info_lbl.configure(text=f"Exact amount of ₱{self.calculated_total:,.2f} will be billed.")
+                self.change_due_label.configure(text="Exact Amount", text_color="#059669")
+
+    def on_cash_tendered_change(self, event=None):
+        """Calculates real-time change due as the cashier enters customer cash."""
+        if not hasattr(self, "cash_tendered_entry") or not hasattr(self, "change_due_label"):
+            return
+
+        if self.active_payment_method != "Cash":
+            self.change_due_label.configure(text="Exact Amount", text_color="#059669")
+            return
+
+        raw_val = self.cash_tendered_entry.get().strip().replace("₱", "").replace(",", "")
+        if not raw_val:
+            self.change_due_label.configure(text="Change: ₱0.00", text_color="#64748b")
+            return
+
+        try:
+            tendered = float(raw_val)
+        except ValueError:
+            self.change_due_label.configure(text="Invalid Amount", text_color="#dc2626")
+            return
+
+        change = tendered - self.calculated_total
+        if change >= 0:
+            self.change_due_label.configure(
+                text=f"Change: ₱{change:,.2f}",
+                text_color="#059669"
+            )
+        else:
+            shortage = abs(change)
+            self.change_due_label.configure(
+                text=f"Short: ₱{shortage:,.2f}",
+                text_color="#dc2626"
+            )
+
+    def set_exact_cash(self):
+        """Sets customer cash given to exact order total."""
+        if self.calculated_total <= 0:
+            return
+        self.cash_tendered_entry.delete(0, "end")
+        self.cash_tendered_entry.insert(0, f"{self.calculated_total:.2f}")
+        self.on_cash_tendered_change()
+
+    def set_preset_cash(self, amount):
+        """Sets customer cash given to a preset denomination."""
+        self.cash_tendered_entry.delete(0, "end")
+        self.cash_tendered_entry.insert(0, f"{amount:.0f}")
+        self.on_cash_tendered_change()
+
+    def get_cash_received_amount(self) -> float:
+        """Parses entered cash amount with safety defaults."""
+        if self.active_payment_method != "Cash":
+            return self.calculated_total
+
+        if not hasattr(self, "cash_tendered_entry"):
+            return self.calculated_total
+
+        raw_val = self.cash_tendered_entry.get().strip().replace("₱", "").replace(",", "")
+        if not raw_val:
+            return self.calculated_total
+
+        try:
+            val = float(raw_val)
+            return max(0.0, val)
+        except ValueError:
+            return self.calculated_total
 
     def on_search_change(self, event=None):
         """Filter product cards as query changes."""
@@ -1509,7 +1711,25 @@ class BastaPOSApp(customtkinter.CTk):
         """Open the pop-up receipt window (BastaReceiptWindow) with active order data and process sale."""
         if not self.cart_items:
             print("[BASTA POS] Cannot checkout: Cart is empty.")
+            if hasattr(self, "change_due_label"):
+                self.change_due_label.configure(text="Cart is empty", text_color="#dc2626")
             return
+
+        # Determine actual cash received and validate cash sufficiency
+        cash_rec = self.get_cash_received_amount()
+        if self.active_payment_method == "Cash" and cash_rec < self.calculated_total:
+            shortage = self.calculated_total - cash_rec
+            print(f"[BASTA POS] Cannot checkout: Cash received (₱{cash_rec:,.2f}) is short by ₱{shortage:,.2f}.")
+            if hasattr(self, "change_due_label"):
+                self.change_due_label.configure(
+                    text=f"Short: ₱{shortage:,.2f}",
+                    text_color="#dc2626"
+                )
+            if hasattr(self, "cash_tendered_entry"):
+                self.cash_tendered_entry.focus()
+            return
+
+        chg_due = max(0.0, cash_rec - self.calculated_total)
 
         items_list = []
         for name, info in self.cart_items.items():
@@ -1585,8 +1805,6 @@ class BastaPOSApp(customtkinter.CTk):
 
         if record_sale_transaction:
             try:
-                cash_rec = 1000.0 if self.active_payment_method == "Cash" else self.calculated_total
-                chg_due = max(0.0, cash_rec - self.calculated_total)
                 record_sale_transaction(
                     transaction_id=txn_id,
                     order_id=order_id,
@@ -1620,8 +1838,8 @@ class BastaPOSApp(customtkinter.CTk):
             "service_charge": self.calculated_service_charge,
             "total": self.calculated_total,
             "payment_method": self.active_payment_method,
-            "cash_received": 1000.0 if self.active_payment_method == "Cash" else self.calculated_total,
-            "change_due": max(0.0, (1000.0 if self.active_payment_method == "Cash" else self.calculated_total) - self.calculated_total)
+            "cash_received": cash_rec,
+            "change_due": chg_due
         }
 
         try:
@@ -1661,7 +1879,10 @@ class BastaPOSApp(customtkinter.CTk):
                     pass
         except Exception:
             pass
-        super().destroy()
+        try:
+            super().destroy()
+        except Exception:
+            pass
 
     def handle_logout(self):
         """Transition back to the login page."""

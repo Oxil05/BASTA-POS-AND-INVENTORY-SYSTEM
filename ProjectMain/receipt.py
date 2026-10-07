@@ -626,7 +626,10 @@ class BastaReceiptWindow(customtkinter.CTkToplevel):
                     pass
         except Exception:
             pass
-        super().destroy()
+        try:
+            super().destroy()
+        except Exception:
+            pass
 
     def handle_print_receipt(self):
         """Simulate receipt printing feedback."""
