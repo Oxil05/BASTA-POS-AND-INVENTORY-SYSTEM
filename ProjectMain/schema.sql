@@ -15,18 +15,16 @@ CREATE TABLE IF NOT EXISTS `users` (
     `password_hash` VARCHAR(255) NOT NULL,
     `full_name` VARCHAR(100) NOT NULL,
     `email` VARCHAR(120),
-    `role` ENUM('Administrator', 'Shift Supervisor', 'Cashier', 'Inventory Manager') NOT NULL DEFAULT 'Cashier',
+    `role` ENUM('Administrator', 'Cashier') NOT NULL DEFAULT 'Cashier',
     `status` ENUM('Active', 'Disabled') NOT NULL DEFAULT 'Active',
     `last_login` DATETIME NULL,
     `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- Seed default user accounts
+-- Seed default user accounts (Only Administrator and Cashier)
 INSERT INTO `users` (`username`, `password_hash`, `full_name`, `email`, `role`, `status`) VALUES
 ('admin', 'admin123', 'Chef Marco S.', 'admin@bastaburger.com', 'Administrator', 'Active'),
-('cashier1', 'cashier123', 'Bea M.', 'bea@bastaburger.com', 'Cashier', 'Active'),
-('supervisor', 'super123', 'Danilo R.', 'danilo@bastaburger.com', 'Shift Supervisor', 'Active'),
-('inventory1', 'inv123', 'Aris P.', 'aris@bastaburger.com', 'Inventory Manager', 'Active')
+('cashier1', 'cashier123', 'Bea M.', 'bea@bastaburger.com', 'Cashier', 'Active')
 ON DUPLICATE KEY UPDATE `username`=`username`;
 
 -- --------------------------------------------------------------------
@@ -38,7 +36,7 @@ CREATE TABLE IF NOT EXISTS `categories` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 INSERT INTO `categories` (`name`) VALUES
-('All items'), ('Burgers'), ('Sides'), ('Beverages'), ('Desserts')
+('Burgers'), ('Sides'), ('Meals'), ('Pasta'), ('Beverages'), ('Desserts')
 ON DUPLICATE KEY UPDATE `name`=`name`;
 
 -- --------------------------------------------------------------------
@@ -61,15 +59,15 @@ CREATE TABLE IF NOT EXISTS `products` (
     `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-INSERT INTO `products` (`sku`, `name`, `category`, `price`, `cost_price`, `stock_quantity`, `low_stock_threshold`, `in_store`, `online_ordering`, `grabfood`, `status`) VALUES
-('BGR-001', 'Classic Basta Smash Burger', 'Burgers', 189.00, 85.00, 32, 12, TRUE, TRUE, TRUE, 'Active'),
-('BGR-002', 'Truffle Mushroom Cheeseburger', 'Burgers', 249.00, 110.00, 18, 8, TRUE, TRUE, FALSE, 'Active'),
-('BGR-003', 'Spicy BBQ Bacon Deluxe', 'Burgers', 229.00, 95.00, 24, 10, TRUE, TRUE, TRUE, 'Active'),
-('DRK-001', 'Ube Shake Special', 'Beverages', 120.00, 45.00, 45, 15, TRUE, TRUE, FALSE, 'Active'),
-('DRK-002', 'Calamansi Cold Brew Fizz', 'Beverages', 95.00, 30.00, 50, 15, TRUE, TRUE, TRUE, 'Active'),
-('SDE-001', 'Crispy Golden Fries', 'Sides', 79.00, 25.00, 60, 20, TRUE, TRUE, TRUE, 'Active'),
-('SDE-002', 'Garlic Parmesan Wedges', 'Sides', 99.00, 35.00, 22, 10, TRUE, TRUE, FALSE, 'Active'),
-('DES-001', 'Warm Brioche Ice Cream Bun', 'Desserts', 119.00, 40.00, 8, 10, TRUE, FALSE, FALSE, 'Active')
+INSERT INTO `products` (`sku`, `name`, `category`, `price`, `cost_price`, `stock_quantity`, `low_stock_threshold`, `in_store`, `online_ordering`, `grabfood`, `status`, `image_filename`) VALUES
+('BUR-001', 'Basta Smash Burger', 'Burgers', 285.00, 110.00, 45, 10, TRUE, TRUE, TRUE, 'Active', 'BASTA_SMASHBURGER.jpg'),
+('BUR-002', 'Crispy Chicken Sandwich', 'Burgers', 220.00, 95.00, 35, 8, TRUE, TRUE, TRUE, 'Active', 'BASTA_CRISPY CHICKEN SANDWICH.jpg'),
+('SDE-001', 'Truffle Parm Fries', 'Sides', 145.00, 55.00, 60, 15, TRUE, TRUE, TRUE, 'Active', 'BASTA_TRUFFLE FRIES.jpg'),
+('MLS-001', 'Calamansi Glazed Wings', 'Meals', 249.00, 110.00, 30, 10, TRUE, TRUE, TRUE, 'Active', 'BASTA_CALAMANSIWINGS.jpg'),
+('PAS-001', 'Slow-Braised Bolognese', 'Pasta', 265.00, 115.00, 25, 8, TRUE, TRUE, FALSE, 'Active', 'BASTA_BOLOGNESE.jpg'),
+('SDE-002', 'Charred Caesar Salad', 'Sides', 185.00, 75.00, 25, 8, TRUE, TRUE, FALSE, 'Active', 'BASTA_CHARRED CAESAR.jpg'),
+('BEV-001', 'Ube Milkshake', 'Beverages', 165.00, 60.00, 50, 15, TRUE, TRUE, FALSE, 'Active', 'BASTA_UBE MILKSHAKE.jpg'),
+('DES-001', 'Warm Sea Salt Choc Cookie', 'Desserts', 95.00, 35.00, 40, 10, TRUE, FALSE, FALSE, 'Active', 'BASTA_SEASALT COOKIE.jpg')
 ON DUPLICATE KEY UPDATE `sku`=`sku`;
 
 -- --------------------------------------------------------------------

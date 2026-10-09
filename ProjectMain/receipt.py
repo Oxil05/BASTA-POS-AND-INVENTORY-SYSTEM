@@ -73,8 +73,8 @@ class BastaReceiptWindow(customtkinter.CTkToplevel):
         }
 
         self.title("BASTA POS - Receipt & Payment Complete")
-        self.geometry("1280x780")
-        self.minsize(1050, 680)
+        self.geometry("1180x760")
+        self.minsize(980, 650)
 
         # Center on screen if parent exists
         if parent_window:
@@ -82,108 +82,13 @@ class BastaReceiptWindow(customtkinter.CTkToplevel):
             pos_y = max(20, parent_window.winfo_y() + 30)
             self.geometry(f"+{pos_x}+{pos_y}")
 
-        # Configure root layout for responsiveness
+        # Configure root layout for responsiveness (2 columns: left confirmation, right tablet receipt)
         self.grid_rowconfigure(0, weight=1)
-        self.grid_columnconfigure(0, weight=0)  # Left dark sidebar
-        self.grid_columnconfigure(1, weight=3)  # Center confirmation panel
-        self.grid_columnconfigure(2, weight=2)  # Right tablet receipt panel
+        self.grid_columnconfigure(0, weight=3)  # Left confirmation panel
+        self.grid_columnconfigure(1, weight=2)  # Right tablet receipt panel
 
-        self._build_sidebar()
         self._build_confirmation_panel()
         self._build_tablet_receipt()
-
-    def _build_sidebar(self):
-        """Constructs the dark sidebar matching the design mockup."""
-        sidebar_frame = customtkinter.CTkFrame(
-            self,
-            width=110,
-            corner_radius=0,
-            fg_color="#09090b"
-        )
-        sidebar_frame.grid(row=0, column=0, sticky="nsew")
-        sidebar_frame.grid_propagate(False)
-        sidebar_frame.grid_rowconfigure(5, weight=1)
-
-        # Brand / Logo Header using basta_LOGO.png
-        sidebar_logo_img = get_logo_image(size=(52, 52))
-        if sidebar_logo_img:
-            logo_label = customtkinter.CTkLabel(
-                sidebar_frame,
-                image=sidebar_logo_img,
-                text=""
-            )
-            logo_label.grid(row=0, column=0, padx=10, pady=(20, 2))
-
-            brand_label = customtkinter.CTkLabel(
-                sidebar_frame,
-                text="BASTA POS",
-                font=customtkinter.CTkFont(size=12, weight="bold"),
-                text_color="#f8fafc"
-            )
-            brand_label.grid(row=1, column=0, padx=10, pady=(0, 20))
-        else:
-            brand_label = customtkinter.CTkLabel(
-                sidebar_frame,
-                text="🍔\nBASTA\nPOS",
-                font=customtkinter.CTkFont(size=14, weight="bold"),
-                text_color="#f8fafc"
-            )
-            brand_label.grid(row=0, column=0, padx=10, pady=(25, 30))
-
-        # Nav items matching BASTA_RECEIPT.png (POS, Products, Transactions)
-        pos_nav_btn = customtkinter.CTkButton(
-            sidebar_frame,
-            text="⊞\nPOS",
-            width=70,
-            height=60,
-            corner_radius=14,
-            font=customtkinter.CTkFont(size=12, weight="bold"),
-            fg_color="#10b981",
-            text_color="#ffffff",
-            hover_color="#059669"
-        )
-        pos_nav_btn.grid(row=2, column=0, padx=15, pady=6)
-
-        products_nav_btn = customtkinter.CTkButton(
-            sidebar_frame,
-            text="📦\nProducts",
-            width=70,
-            height=50,
-            corner_radius=10,
-            font=customtkinter.CTkFont(size=11),
-            fg_color="transparent",
-            text_color="#9ca3af",
-            hover_color="#1f2937"
-        )
-        products_nav_btn.grid(row=3, column=0, padx=15, pady=6)
-
-        tx_nav_btn = customtkinter.CTkButton(
-            sidebar_frame,
-            text="📊\nTransactions",
-            width=70,
-            height=50,
-            corner_radius=10,
-            font=customtkinter.CTkFont(size=10),
-            fg_color="transparent",
-            text_color="#9ca3af",
-            hover_color="#1f2937"
-        )
-        tx_nav_btn.grid(row=4, column=0, padx=15, pady=6)
-
-        # Logout at bottom
-        logout_btn = customtkinter.CTkButton(
-            sidebar_frame,
-            text="➔\nLog out",
-            width=70,
-            height=50,
-            corner_radius=10,
-            font=customtkinter.CTkFont(size=11),
-            fg_color="transparent",
-            text_color="#9ca3af",
-            hover_color="#1f2937",
-            command=self.destroy
-        )
-        logout_btn.grid(row=6, column=0, padx=15, pady=(10, 25))
 
     def _build_confirmation_panel(self):
         """Constructs the Payment Complete section on the left."""
@@ -194,7 +99,7 @@ class BastaReceiptWindow(customtkinter.CTkToplevel):
             border_width=1,
             border_color="#e2e8f0"
         )
-        center_scroll.grid(row=0, column=1, sticky="nsew", padx=20, pady=20)
+        center_scroll.grid(row=0, column=0, sticky="nsew", padx=20, pady=20)
         center_scroll.grid_columnconfigure(0, weight=1)
 
         order_id = self.order_data.get("order_id", "#B-1048")
@@ -390,7 +295,7 @@ class BastaReceiptWindow(customtkinter.CTkToplevel):
             fg_color="#f1f5f9",
             corner_radius=0
         )
-        tablet_container.grid(row=0, column=2, sticky="nsew", padx=(0, 20), pady=20)
+        tablet_container.grid(row=0, column=1, sticky="nsew", padx=(0, 20), pady=20)
         tablet_container.grid_rowconfigure(0, weight=1)
         tablet_container.grid_columnconfigure(0, weight=1)
 

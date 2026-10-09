@@ -93,7 +93,7 @@ def initialize_database():
                 `password_hash` VARCHAR(255) NOT NULL,
                 `full_name` VARCHAR(100) NOT NULL,
                 `email` VARCHAR(120),
-                `role` ENUM('Administrator', 'Shift Supervisor', 'Cashier', 'Inventory Manager') NOT NULL DEFAULT 'Cashier',
+                `role` ENUM('Administrator', 'Cashier') NOT NULL DEFAULT 'Cashier',
                 `status` ENUM('Active', 'Disabled') NOT NULL DEFAULT 'Active',
                 `last_login` DATETIME NULL,
                 `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -201,6 +201,19 @@ def initialize_database():
             conn.close()
 
 
+# Default menu products that have verified image files in Designs/
+DEFAULT_SEED_PRODUCTS = [
+    ("BUR-001", "Basta Smash Burger", "Burgers", 285.00, 110.00, 45, 10, True, True, True, "Active", "BASTA_SMASHBURGER.jpg"),
+    ("BUR-002", "Crispy Chicken Sandwich", "Burgers", 220.00, 95.00, 35, 8, True, True, True, "Active", "BASTA_CRISPY CHICKEN SANDWICH.jpg"),
+    ("SDE-001", "Truffle Parm Fries", "Sides", 145.00, 55.00, 60, 15, True, True, True, "Active", "BASTA_TRUFFLE FRIES.jpg"),
+    ("MLS-001", "Calamansi Glazed Wings", "Meals", 249.00, 110.00, 30, 10, True, True, True, "Active", "BASTA_CALAMANSIWINGS.jpg"),
+    ("PAS-001", "Slow-Braised Bolognese", "Pasta", 265.00, 115.00, 25, 8, True, True, False, "Active", "BASTA_BOLOGNESE.jpg"),
+    ("SDE-002", "Charred Caesar Salad", "Sides", 185.00, 75.00, 25, 8, True, True, False, "Active", "BASTA_CHARRED CAESAR.jpg"),
+    ("BEV-001", "Ube Milkshake", "Beverages", 165.00, 60.00, 50, 15, True, True, False, "Active", "BASTA_UBE MILKSHAKE.jpg"),
+    ("DES-001", "Warm Sea Salt Choc Cookie", "Desserts", 95.00, 35.00, 40, 10, True, False, False, "Active", "BASTA_SEASALT COOKIE.jpg")
+]
+
+
 def _seed_sample_data(cursor):
     """Inserts initial users, products, and inventory items if tables are empty."""
     # Check users
@@ -210,28 +223,32 @@ def _seed_sample_data(cursor):
         cursor.execute("""
             INSERT INTO `users` (`username`, `password_hash`, `full_name`, `email`, `role`, `status`) VALUES
             ('admin', 'admin123', 'Chef Marco S.', 'admin@bastaburger.com', 'Administrator', 'Active'),
-            ('cashier1', 'cashier123', 'Bea M.', 'bea@bastaburger.com', 'Cashier', 'Active'),
-            ('supervisor', 'super123', 'Danilo R.', 'danilo@bastaburger.com', 'Shift Supervisor', 'Active'),
-            ('inventory1', 'inv123', 'Aris P.', 'aris@bastaburger.com', 'Inventory Manager', 'Active');
+            ('cashier1', 'cashier123', 'Bea M.', 'bea@bastaburger.com', 'Cashier', 'Active');
         """)
-        print("  -> Seeded 4 default user accounts.")
+        print("  -> Seeded 2 default user accounts (Administrator, Cashier).")
 
-    # Check products
+    # 2. Check and seed categories
+    cursor.execute("SELECT COUNT(*) FROM `categories`;")
+    cat_count = cursor.fetchone()[0]
+    if cat_count == 0:
+        cursor.execute("""
+            INSERT INTO `categories` (`name`) VALUES
+            ('Burgers'), ('Sides'), ('Meals'), ('Pasta'), ('Beverages'), ('Desserts');
+        """)
+        print("  -> Seeded 6 default menu categories.")
+
+    # 3. Check and seed products (Only products with verified images)
     cursor.execute("SELECT COUNT(*) FROM `products`;")
     prod_count = cursor.fetchone()[0]
     if prod_count == 0:
-        cursor.execute("""
-            INSERT INTO `products` (`sku`, `name`, `category`, `price`, `cost_price`, `stock_quantity`, `low_stock_threshold`, `in_store`, `online_ordering`, `grabfood`, `status`) VALUES
-            ('BGR-001', 'Classic Basta Smash Burger', 'Burgers', 189.00, 85.00, 32, 12, TRUE, TRUE, TRUE, 'Active'),
-            ('BGR-002', 'Truffle Mushroom Cheeseburger', 'Burgers', 249.00, 110.00, 18, 8, TRUE, TRUE, FALSE, 'Active'),
-            ('BGR-003', 'Spicy BBQ Bacon Deluxe', 'Burgers', 229.00, 95.00, 24, 10, TRUE, TRUE, TRUE, 'Active'),
-            ('DRK-001', 'Ube Shake Special', 'Beverages', 120.00, 45.00, 45, 15, TRUE, TRUE, FALSE, 'Active'),
-            ('DRK-002', 'Calamansi Cold Brew Fizz', 'Beverages', 95.00, 30.00, 50, 15, TRUE, TRUE, TRUE, 'Active'),
-            ('SDE-001', 'Crispy Golden Fries', 'Sides', 79.00, 25.00, 60, 20, TRUE, TRUE, TRUE, 'Active'),
-            ('SDE-002', 'Garlic Parmesan Wedges', 'Sides', 99.00, 35.00, 22, 10, TRUE, TRUE, FALSE, 'Active'),
-            ('DES-001', 'Warm Brioche Ice Cream Bun', 'Desserts', 119.00, 40.00, 8, 10, TRUE, FALSE, FALSE, 'Active');
-        """)
-        print("  -> Seeded 8 default menu products.")
+        insert_prod_sql = """
+            INSERT INTO `products` 
+            (`sku`, `name`, `category`, `price`, `cost_price`, `stock_quantity`, `low_stock_threshold`, `in_store`, `online_ordering`, `grabfood`, `status`, `image_filename`)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
+        """
+        for prod in DEFAULT_SEED_PRODUCTS:
+            cursor.execute(insert_prod_sql, prod)
+        print(f"  -> Seeded {len(DEFAULT_SEED_PRODUCTS)} default menu products with verified images.")
 
     # Check inventory
     cursor.execute("SELECT COUNT(*) FROM `inventory_items`;")
@@ -246,6 +263,51 @@ def _seed_sample_data(cursor):
             ('ING-0102', 'Calamansi glaze', 'Sauces', 3.0, 8.0, 'bottles', 145.00, 'Low stock');
         """)
         print("  -> Seeded 5 inventory ingredient items.")
+
+
+def reset_products_database():
+    """
+    Resets the products and categories tables in MySQL,
+    and seeds only the 8 products that have verified image files in Designs/.
+    """
+    print("\n" + "=" * 60)
+    print(" BASTA POS - Resetting Products Database (Pictured Products Only)")
+    print("=" * 60)
+    conn = get_db_connection(use_database=True)
+    if not conn:
+        print("[BASTA DB] Cannot reset products: No database connection.")
+        return False
+    try:
+        cursor = conn.cursor()
+
+        # 1. Reset categories
+        cursor.execute("DELETE FROM `categories`;")
+        categories = ["Burgers", "Sides", "Meals", "Pasta", "Beverages", "Desserts"]
+        for cat in categories:
+            cursor.execute("INSERT INTO `categories` (`name`) VALUES (%s);", (cat,))
+        print("  -> Reset and updated 6 menu categories.")
+
+        # 2. Reset products
+        cursor.execute("DELETE FROM `products`;")
+        cursor.execute("ALTER TABLE `products` AUTO_INCREMENT = 1;")
+
+        insert_prod_sql = """
+            INSERT INTO `products` 
+            (`sku`, `name`, `category`, `price`, `cost_price`, `stock_quantity`, `low_stock_threshold`, `in_store`, `online_ordering`, `grabfood`, `status`, `image_filename`)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
+        """
+        for prod in DEFAULT_SEED_PRODUCTS:
+            cursor.execute(insert_prod_sql, prod)
+
+        conn.commit()
+        cursor.close()
+        conn.close()
+        print(f"[SUCCESS] Reset products table with {len(DEFAULT_SEED_PRODUCTS)} pictured products!")
+        print("=" * 60)
+        return True
+    except Exception as err:
+        print(f"[BASTA DB] Error resetting products database: {err}")
+        return False
 
 
 # Helper functions to query data
@@ -351,7 +413,7 @@ def verify_user_login(username, password):
 
 # --- PRODUCT DATA MANIPULATION (CRUD) ---
 
-def add_product(name, sku, category, price, cost_price=0.0, stock_quantity=0, low_stock_threshold=10, in_store=True, online_ordering=True, grabfood=False):
+def add_product(name, sku, category, price, cost_price=0.0, stock_quantity=0, low_stock_threshold=10, in_store=True, online_ordering=True, grabfood=False, image_filename="basta_LOGO.png"):
     """Inserts a new product into MySQL database."""
     conn = get_db_connection()
     if not conn:
@@ -359,9 +421,9 @@ def add_product(name, sku, category, price, cost_price=0.0, stock_quantity=0, lo
     try:
         cursor = conn.cursor()
         cursor.execute("""
-            INSERT INTO `products` (`name`, `sku`, `category`, `price`, `cost_price`, `stock_quantity`, `low_stock_threshold`, `in_store`, `online_ordering`, `grabfood`, `status`)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'Active');
-        """, (name, sku, category, price, cost_price, stock_quantity, low_stock_threshold, in_store, online_ordering, grabfood))
+            INSERT INTO `products` (`name`, `sku`, `category`, `price`, `cost_price`, `stock_quantity`, `low_stock_threshold`, `in_store`, `online_ordering`, `grabfood`, `status`, `image_filename`)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'Active', %s);
+        """, (name, sku, category, price, cost_price, stock_quantity, low_stock_threshold, in_store, online_ordering, grabfood, image_filename or "basta_LOGO.png"))
         conn.commit()
         new_id = cursor.lastrowid
         cursor.close()
@@ -372,20 +434,29 @@ def add_product(name, sku, category, price, cost_price=0.0, stock_quantity=0, lo
         return None
 
 
-def update_product(product_id, name, sku, category, price, cost_price, stock_quantity, low_stock_threshold, in_store, online_ordering, grabfood):
+def update_product(product_id, name, sku, category, price, cost_price, stock_quantity, low_stock_threshold, in_store, online_ordering, grabfood, image_filename=None):
     """Updates an existing product in MySQL database."""
     conn = get_db_connection()
     if not conn:
         return False
     try:
         cursor = conn.cursor()
-        cursor.execute("""
-            UPDATE `products`
-            SET `name` = %s, `sku` = %s, `category` = %s, `price` = %s, `cost_price` = %s,
-                `stock_quantity` = %s, `low_stock_threshold` = %s, `in_store` = %s,
-                `online_ordering` = %s, `grabfood` = %s
-            WHERE `id` = %s;
-        """, (name, sku, category, price, cost_price, stock_quantity, low_stock_threshold, in_store, online_ordering, grabfood, product_id))
+        if image_filename is not None:
+            cursor.execute("""
+                UPDATE `products`
+                SET `name` = %s, `sku` = %s, `category` = %s, `price` = %s, `cost_price` = %s,
+                    `stock_quantity` = %s, `low_stock_threshold` = %s, `in_store` = %s,
+                    `online_ordering` = %s, `grabfood` = %s, `image_filename` = %s
+                WHERE `id` = %s;
+            """, (name, sku, category, price, cost_price, stock_quantity, low_stock_threshold, in_store, online_ordering, grabfood, image_filename, product_id))
+        else:
+            cursor.execute("""
+                UPDATE `products`
+                SET `name` = %s, `sku` = %s, `category` = %s, `price` = %s, `cost_price` = %s,
+                    `stock_quantity` = %s, `low_stock_threshold` = %s, `in_store` = %s,
+                    `online_ordering` = %s, `grabfood` = %s
+                WHERE `id` = %s;
+            """, (name, sku, category, price, cost_price, stock_quantity, low_stock_threshold, in_store, online_ordering, grabfood, product_id))
         conn.commit()
         cursor.close()
         conn.close()
@@ -529,6 +600,11 @@ def record_sale_transaction(transaction_id, order_id, table_num, cashier_name, p
 
 
 if __name__ == "__main__":
-    success = initialize_database()
-    if not success:
-        sys.exit(1)
+    if "--reset-products" in sys.argv:
+        success = reset_products_database()
+        if not success:
+            sys.exit(1)
+    else:
+        success = initialize_database()
+        if not success:
+            sys.exit(1)

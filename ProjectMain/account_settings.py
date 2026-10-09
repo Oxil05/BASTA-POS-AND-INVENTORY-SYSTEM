@@ -7,6 +7,7 @@ All variables and functions strictly use snake_case.
 
 import os
 import sys
+from tkinter import messagebox
 from PIL import Image
 import customtkinter
 
@@ -38,21 +39,19 @@ class AccountSettingsView(customtkinter.CTkFrame):
     Can be embedded directly into BastaPOSApp or displayed in any window.
     """
 
-    def __init__(self, master, app_controller=None, **kwargs):
+    def __init__(self, master, app_controller=None, current_role="Administrator", **kwargs):
         super().__init__(master, fg_color="#f1f5f9", **kwargs)
         self.app_controller = app_controller
+        self.current_role = getattr(app_controller, "current_role", current_role)
 
-        # Account dataset: load from database or fallback
+        # Account dataset: load from database or fallback (Admin and Cashier only)
         default_accounts = [
             {"id": 1, "name": "Chef Marco Santos", "email": "marco.s@bastaburger.ph", "user": "marco_admin", "role": "Administrator", "status": "Active", "last_login": "Today, 08:30 AM"},
-            {"id": 2, "name": "Bea Mendoza", "email": "bea.m@bastaburger.ph", "user": "bea_cashier", "role": "Cashier", "status": "Active", "last_login": "Today, 09:12 AM"},
-            {"id": 3, "name": "Danilo Reyes", "email": "danilo.r@bastaburger.ph", "user": "dan_shift", "role": "Shift Supervisor", "status": "Active", "last_login": "Yesterday, 10:45 PM"},
-            {"id": 4, "name": "Aris Pangilinan", "email": "aris.p@bastaburger.ph", "user": "aris_stock", "role": "Inventory Manager", "status": "Active", "last_login": "Yesterday, 04:15 PM"},
-            {"id": 5, "name": "Chloe Villanueva", "email": "chloe.v@bastaburger.ph", "user": "chloe_pos", "role": "Cashier", "status": "Active", "last_login": "2 days ago"},
-            {"id": 6, "name": "Rafael Dizon", "email": "rafael.d@bastaburger.ph", "user": "raf_d", "role": "Administrator", "status": "Active", "last_login": "5 days ago"}
+            {"id": 2, "name": "Bea Mendoza", "email": "bea.m@bastaburger.ph", "user": "bea_cashier", "role": "Cashier", "status": "Active", "last_login": "Today, 09:12 AM"}
         ]
 
         self.accounts = default_accounts
+
         try:
             from database import fetch_all_users
             db_users = fetch_all_users()
@@ -80,6 +79,11 @@ class AccountSettingsView(customtkinter.CTkFrame):
 
         self._build_main_content()
 
+    def is_admin(self):
+        """Check if active user has administrator privileges."""
+        role = getattr(self.app_controller, "current_role", getattr(self, "current_role", "Administrator"))
+        return str(role).strip().lower() in ["admin", "administrator"]
+
     def _build_main_content(self):
         main_scroll = customtkinter.CTkScrollableFrame(
             self,
@@ -106,12 +110,15 @@ class AccountSettingsView(customtkinter.CTkFrame):
             font=customtkinter.CTkFont(size=12), text_color="#64748b"
         ).pack(anchor="w")
 
+        add_btn_text = "+ Add New Account" if self.is_admin() else "🔒 Add Account (Admin Only)"
+        add_btn_fg = "#10b981" if self.is_admin() else "#94a3b8"
+        add_btn_hover = "#059669" if self.is_admin() else "#94a3b8"
         add_user_btn = customtkinter.CTkButton(
             top_bar,
-            text="+ Add New Account",
+            text=add_btn_text,
             font=customtkinter.CTkFont(size=12, weight="bold"),
-            fg_color="#10b981",
-            hover_color="#059669",
+            fg_color=add_btn_fg,
+            hover_color=add_btn_hover,
             height=38,
             corner_radius=10,
             command=self.open_create_account_modal
@@ -124,11 +131,14 @@ class AccountSettingsView(customtkinter.CTkFrame):
         for col_idx in range(4):
             metrics_frame.grid_columnconfigure(col_idx, weight=1)
 
+        total_users = len(self.accounts)
+        admin_count = sum(1 for a in self.accounts if a.get("role") == "Administrator")
+        cashier_count = sum(1 for a in self.accounts if a.get("role") == "Cashier")
         metrics = [
-            ("TOTAL ACCOUNTS", "12 users", "+2 added this month", "👥"),
-            ("ACTIVE STAFF", "9 active", "On shift: 4 cashiers", "🟢"),
-            ("ADMINISTRATORS", "3 admins", "Full system privileges", "🛡"),
-            ("LOCKED / INACTIVE", "0 locked", "All accounts healthy", "🔒")
+            ("TOTAL ACCOUNTS", f"{total_users} users", "System registered", "👥"),
+            ("CASHIERS", f"{cashier_count} active", "POS Register only", "🟢"),
+            ("ADMINISTRATORS", f"{admin_count} admins", "Full system privileges", "🛡"),
+            ("ACCOUNT STATUS", "Healthy", "All accounts active", "🔒")
         ]
 
         for idx, (m_title, m_val, m_sub, m_badge) in enumerate(metrics):
@@ -161,7 +171,7 @@ class AccountSettingsView(customtkinter.CTkFrame):
         self.search_entry.bind("<KeyRelease>", self.on_search)
 
         self.role_filter = customtkinter.CTkComboBox(
-            filter_bar, values=["All Roles", "Administrator", "Shift Supervisor", "Cashier", "Inventory Manager"],
+            filter_bar, values=["All Roles", "Administrator", "Cashier"],
             height=36, corner_radius=10, command=self.on_filter_role, width=180
         )
         self.role_filter.grid(row=0, column=1, sticky="e")
@@ -257,6 +267,10 @@ class AccountSettingsView(customtkinter.CTkFrame):
         self.render_accounts_table(query=self.search_entry.get().strip(), role_filter=role)
 
     def open_create_account_modal(self):
+        if not self.is_admin():
+            messagebox.showwarning("Permission Denied", "Access Denied: Only Administrators are authorized to create user accounts.")
+            return
+
         modal = customtkinter.CTkToplevel(self)
         modal.title("Add New Account")
         modal.geometry("460x520")
@@ -278,7 +292,7 @@ class AccountSettingsView(customtkinter.CTkFrame):
             entries[lbl_txt] = e
 
         customtkinter.CTkLabel(modal, text="Assigned Role:", font=customtkinter.CTkFont(size=11, weight="bold")).pack(anchor="w", padx=30, pady=(4, 0))
-        role_cb = customtkinter.CTkComboBox(modal, values=["Cashier", "Shift Supervisor", "Inventory Manager", "Administrator"], width=400, height=36)
+        role_cb = customtkinter.CTkComboBox(modal, values=["Cashier", "Administrator"], width=400, height=36)
         role_cb.pack(padx=30, pady=(2, 16))
 
         def confirm_create():
@@ -315,6 +329,10 @@ class AccountSettingsView(customtkinter.CTkFrame):
         ).pack(padx=30, pady=10)
 
     def open_edit_account_modal(self, acc):
+        if not self.is_admin():
+            messagebox.showwarning("Permission Denied", "Access Denied: Only Administrators are authorized to edit user accounts.")
+            return
+
         modal = customtkinter.CTkToplevel(self)
         modal.title(f"Edit Account: {acc['name']}")
         modal.geometry("460x420")
@@ -333,7 +351,7 @@ class AccountSettingsView(customtkinter.CTkFrame):
         email_e.pack(padx=30, pady=(2, 8))
 
         customtkinter.CTkLabel(modal, text="Assigned Role:", font=customtkinter.CTkFont(size=11, weight="bold")).pack(anchor="w", padx=30)
-        role_cb = customtkinter.CTkComboBox(modal, values=["Cashier", "Shift Supervisor", "Inventory Manager", "Administrator"], width=400, height=36)
+        role_cb = customtkinter.CTkComboBox(modal, values=["Cashier", "Administrator"], width=400, height=36)
         role_cb.set(acc["role"])
         role_cb.pack(padx=30, pady=(2, 18))
 
@@ -359,6 +377,9 @@ class AccountSettingsView(customtkinter.CTkFrame):
         ).pack(padx=30, pady=10)
 
     def delete_account(self, acc):
+        if not self.is_admin():
+            messagebox.showwarning("Permission Denied", "Access Denied: Only Administrators are authorized to delete user accounts.")
+            return
         if acc in self.accounts:
             try:
                 from database import delete_user

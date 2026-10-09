@@ -7,6 +7,8 @@ All variables and functions strictly use snake_case.
 
 import os
 import sys
+import shutil
+from tkinter import filedialog, messagebox
 from PIL import Image
 import customtkinter
 
@@ -38,46 +40,60 @@ class ProductManagementView(customtkinter.CTkFrame):
     Can be embedded directly into BastaPOSApp or displayed in any window.
     """
 
-    def __init__(self, master, app_controller=None, **kwargs):
+    def __init__(self, master, app_controller=None, current_role="Administrator", **kwargs):
         super().__init__(master, fg_color="#f1f5f9", **kwargs)
         self.app_controller = app_controller
+        self.current_role = getattr(app_controller, "current_role", current_role)
 
-        # Load products from database or fallback to default dataset
+        # Load products from database or fallback to default dataset (all 8 pictured products)
         default_products = [
             {
-                "id": 1, "sku": "BUR-001", "name": "Classic Basta Smash Burger", "category": "Burgers",
-                "price": 189.00, "cost_price": 85.00, "stock": 32, "low_stock": 10,
-                "in_store": True, "online": True, "grabfood": True, "status": "Active"
+                "id": 1, "sku": "BUR-001", "name": "Basta Smash Burger", "category": "Burgers",
+                "price": 285.00, "cost_price": 110.00, "stock": 45, "low_stock": 10,
+                "in_store": True, "online": True, "grabfood": False, "status": "Active",
+                "image_filename": "BASTA_SMASHBURGER.jpg"
             },
             {
-                "id": 2, "sku": "BUR-002", "name": "Truffle Mushroom Cheeseburger", "category": "Burgers",
-                "price": 249.00, "cost_price": 110.00, "stock": 18, "low_stock": 8,
-                "in_store": True, "online": True, "grabfood": False, "status": "Active"
+                "id": 2, "sku": "BUR-002", "name": "Crispy Chicken Sandwich", "category": "Burgers",
+                "price": 220.00, "cost_price": 95.00, "stock": 35, "low_stock": 8,
+                "in_store": True, "online": True, "grabfood": False, "status": "Active",
+                "image_filename": "BASTA_CRISPY CHICKEN SANDWICH.jpg"
             },
             {
-                "id": 3, "sku": "BUR-003", "name": "Spicy BBQ Bacon Deluxe", "category": "Burgers",
-                "price": 229.00, "cost_price": 95.00, "stock": 24, "low_stock": 10,
-                "in_store": True, "online": True, "grabfood": True, "status": "Active"
+                "id": 3, "sku": "SDE-001", "name": "Truffle Parm Fries", "category": "Sides",
+                "price": 145.00, "cost_price": 55.00, "stock": 60, "low_stock": 15,
+                "in_store": True, "online": True, "grabfood": False, "status": "Active",
+                "image_filename": "BASTA_TRUFFLE FRIES.jpg"
             },
             {
-                "id": 4, "sku": "DRK-001", "name": "Ube Shake Special", "category": "Beverages",
-                "price": 120.00, "cost_price": 45.00, "stock": 45, "low_stock": 15,
-                "in_store": True, "online": True, "grabfood": False, "status": "Active"
+                "id": 4, "sku": "MLS-001", "name": "Calamansi Glazed Wings", "category": "Meals",
+                "price": 249.00, "cost_price": 110.00, "stock": 30, "low_stock": 10,
+                "in_store": True, "online": True, "grabfood": False, "status": "Active",
+                "image_filename": "BASTA_CALAMANSIWINGS.jpg"
             },
             {
-                "id": 5, "sku": "DRK-002", "name": "Calamansi Cold Brew Fizz", "category": "Beverages",
-                "price": 95.00, "cost_price": 30.00, "stock": 50, "low_stock": 15,
-                "in_store": True, "online": True, "grabfood": True, "status": "Active"
+                "id": 5, "sku": "PAS-001", "name": "Slow-Braised Bolognese", "category": "Pasta",
+                "price": 265.00, "cost_price": 115.00, "stock": 25, "low_stock": 8,
+                "in_store": True, "online": True, "grabfood": False, "status": "Active",
+                "image_filename": "BASTA_BOLOGNESE.jpg"
             },
             {
-                "id": 6, "sku": "SDE-001", "name": "Crispy Golden Fries", "category": "Sides",
-                "price": 79.00, "cost_price": 25.00, "stock": 60, "low_stock": 20,
-                "in_store": True, "online": True, "grabfood": True, "status": "Active"
+                "id": 6, "sku": "SDE-002", "name": "Charred Caesar Salad", "category": "Sides",
+                "price": 185.00, "cost_price": 75.00, "stock": 25, "low_stock": 8,
+                "in_store": True, "online": True, "grabfood": False, "status": "Active",
+                "image_filename": "BASTA_CHARRED CAESAR.jpg"
             },
             {
-                "id": 7, "sku": "DES-001", "name": "Warm Brioche Ice Cream Bun", "category": "Desserts",
-                "price": 119.00, "cost_price": 40.00, "stock": 8, "low_stock": 10,
-                "in_store": True, "online": False, "grabfood": False, "status": "Active"
+                "id": 7, "sku": "BEV-001", "name": "Ube Milkshake", "category": "Beverages",
+                "price": 165.00, "cost_price": 60.00, "stock": 50, "low_stock": 15,
+                "in_store": True, "online": True, "grabfood": False, "status": "Active",
+                "image_filename": "BASTA_UBE MILKSHAKE.jpg"
+            },
+            {
+                "id": 8, "sku": "DES-001", "name": "Warm Sea Salt Choc Cookie", "category": "Desserts",
+                "price": 95.00, "cost_price": 35.00, "stock": 40, "low_stock": 10,
+                "in_store": True, "online": False, "grabfood": False, "status": "Active",
+                "image_filename": "BASTA_SEASALT COOKIE.jpg"
             }
         ]
 
@@ -98,8 +114,9 @@ class ProductManagementView(customtkinter.CTkFrame):
                         "low_stock": int(p.get("low_stock_threshold", 10)),
                         "in_store": bool(p.get("in_store", 1)),
                         "online": bool(p.get("online_ordering", 1)),
-                        "grabfood": bool(p.get("grabfood", 0)),
-                        "status": p.get("status", "Active")
+                        "grabfood": False,
+                        "status": p.get("status", "Active"),
+                        "image_filename": p.get("image_filename") or "basta_LOGO.png"
                     }
                     for p in db_prods
                 ]
@@ -108,6 +125,8 @@ class ProductManagementView(customtkinter.CTkFrame):
 
         self.selected_product = self.products_data[0] if self.products_data else None
         self.is_creating_new = False
+        self.current_image_filename = self.selected_product.get("image_filename", "basta_LOGO.png") if self.selected_product else "basta_LOGO.png"
+        self.preview_ctk_image = None
 
         # Grid configuration: Column 0 is main catalog, Column 1 is right drawer
         self.grid_rowconfigure(0, weight=1)
@@ -116,6 +135,11 @@ class ProductManagementView(customtkinter.CTkFrame):
 
         self._build_main_content()
         self._build_editor_drawer()
+
+    def is_admin(self):
+        """Check if active user has administrator privileges."""
+        role = getattr(self.app_controller, "current_role", getattr(self, "current_role", "Administrator"))
+        return str(role).strip().lower() in ["admin", "administrator"]
 
     def _build_main_content(self):
         self.main_scroll = customtkinter.CTkScrollableFrame(
@@ -142,17 +166,20 @@ class ProductManagementView(customtkinter.CTkFrame):
             header_info, text="Configure product catalog, adjust pricing, and track availability", font=customtkinter.CTkFont(size=12), text_color="#64748b"
         ).pack(anchor="w")
 
-        add_btn = customtkinter.CTkButton(
+        add_btn_text = "+ Add Product" if self.is_admin() else "🔒 Add Product (Admin Only)"
+        add_btn_fg = "#10b981" if self.is_admin() else "#94a3b8"
+        add_btn_hover = "#059669" if self.is_admin() else "#94a3b8"
+        self.add_btn = customtkinter.CTkButton(
             header_bar,
-            text="+ Add Product",
+            text=add_btn_text,
             font=customtkinter.CTkFont(size=12, weight="bold"),
-            fg_color="#10b981",
-            hover_color="#059669",
+            fg_color=add_btn_fg,
+            hover_color=add_btn_hover,
             height=38,
             corner_radius=10,
             command=self.start_add_new_product
         )
-        add_btn.grid(row=0, column=1, sticky="e")
+        self.add_btn.grid(row=0, column=1, sticky="e")
 
         # 2. Key Metrics Row
         metrics_frame = customtkinter.CTkFrame(self.main_scroll, fg_color="transparent")
@@ -217,18 +244,61 @@ class ProductManagementView(customtkinter.CTkFrame):
         )
         self.editor_title_lbl.grid(row=0, column=0, sticky="w")
 
-        # Product Image Preview / Upload Box
-        img_box = customtkinter.CTkFrame(self.editor_panel, fg_color="#f8fafc", corner_radius=12, border_width=1, border_color="#e2e8f0", height=130)
-        img_box.grid(row=1, column=0, padx=16, pady=(0, 14), sticky="ew")
-        img_box.grid_propagate(False)
-        img_box.grid_columnconfigure(0, weight=1)
+        # Product Image Preview & Upload Controls
+        img_section = customtkinter.CTkFrame(self.editor_panel, fg_color="transparent")
+        img_section.grid(row=1, column=0, padx=16, pady=(0, 14), sticky="ew")
+        img_section.grid_columnconfigure(0, weight=1)
 
-        logo_img = get_logo_image(size=(70, 70))
-        if logo_img:
-            customtkinter.CTkLabel(img_box, image=logo_img, text="").pack(pady=(12, 4))
-        else:
-            customtkinter.CTkLabel(img_box, text="🍔", font=customtkinter.CTkFont(size=32)).pack(pady=(12, 4))
-        customtkinter.CTkLabel(img_box, text="Product Photo Preview", font=customtkinter.CTkFont(size=11), text_color="#64748b").pack()
+        # Image preview frame
+        self.img_preview_box = customtkinter.CTkFrame(
+            img_section, fg_color="#f8fafc", corner_radius=12, border_width=1, border_color="#e2e8f0", height=140
+        )
+        self.img_preview_box.grid(row=0, column=0, sticky="ew")
+        self.img_preview_box.grid_propagate(False)
+
+        self.img_preview_label = customtkinter.CTkLabel(self.img_preview_box, text="")
+        self.img_preview_label.place(relx=0.5, rely=0.5, anchor="center")
+
+        # Filename info label
+        self.img_filename_label = customtkinter.CTkLabel(
+            img_section,
+            text="📷 No image selected",
+            font=customtkinter.CTkFont(size=11),
+            text_color="#64748b"
+        )
+        self.img_filename_label.grid(row=1, column=0, sticky="w", pady=(6, 4))
+
+        # Buttons: Apply Picture (opens file dialog) & Reset
+        img_btn_row = customtkinter.CTkFrame(img_section, fg_color="transparent")
+        img_btn_row.grid(row=2, column=0, sticky="ew", pady=(2, 0))
+        img_btn_row.grid_columnconfigure(0, weight=3)
+        img_btn_row.grid_columnconfigure(1, weight=1)
+
+        self.apply_picture_btn = customtkinter.CTkButton(
+            img_btn_row,
+            text="📁 Apply Picture",
+            height=32,
+            corner_radius=8,
+            font=customtkinter.CTkFont(size=11, weight="bold"),
+            fg_color="#0284c7",
+            text_color="#ffffff",
+            hover_color="#0369a1",
+            command=self.choose_product_image
+        )
+        self.apply_picture_btn.grid(row=0, column=0, padx=(0, 4), sticky="ew")
+
+        self.clear_picture_btn = customtkinter.CTkButton(
+            img_btn_row,
+            text="Reset",
+            height=32,
+            corner_radius=8,
+            font=customtkinter.CTkFont(size=11),
+            fg_color="#f1f5f9",
+            text_color="#64748b",
+            hover_color="#e2e8f0",
+            command=self.clear_product_image
+        )
+        self.clear_picture_btn.grid(row=0, column=1, padx=(4, 0), sticky="ew")
 
         # Product Name
         customtkinter.CTkLabel(self.editor_panel, text="PRODUCT NAME", font=customtkinter.CTkFont(size=11, weight="bold"), text_color="#334155").grid(row=2, column=0, padx=16, sticky="w")
@@ -246,7 +316,7 @@ class ProductManagementView(customtkinter.CTkFrame):
         self.sku_entry.grid(row=1, column=0, sticky="ew", padx=(0, 6), pady=(4, 0))
 
         customtkinter.CTkLabel(meta_row, text="CATEGORY", font=customtkinter.CTkFont(size=11, weight="bold"), text_color="#334155").grid(row=0, column=1, sticky="w")
-        self.category_combo = customtkinter.CTkComboBox(meta_row, values=["Burgers", "Beverages", "Sides", "Desserts", "Meals"], height=38, corner_radius=10)
+        self.category_combo = customtkinter.CTkComboBox(meta_row, values=["Burgers", "Beverages", "Sides", "Desserts", "Meals", "Pasta"], height=38, corner_radius=10)
         self.category_combo.grid(row=1, column=1, sticky="ew", padx=(6, 0), pady=(4, 0))
 
         # Price & Cost Price
@@ -291,9 +361,6 @@ class ProductManagementView(customtkinter.CTkFrame):
         self.online_switch = customtkinter.CTkSwitch(switches_frame, text="Online ordering", progress_color="#10b981")
         self.online_switch.grid(row=1, column=0, sticky="ew", pady=3)
         self.online_switch.select()
-
-        self.grabfood_switch = customtkinter.CTkSwitch(switches_frame, text="GrabFood", progress_color="#10b981")
-        self.grabfood_switch.grid(row=2, column=0, sticky="ew", pady=3)
 
         # Action Buttons: Delete & Save
         actions_drawer = customtkinter.CTkFrame(self.editor_panel, fg_color="transparent")
@@ -357,11 +424,9 @@ class ProductManagementView(customtkinter.CTkFrame):
             customtkinter.CTkLabel(r_frame, text=f"₱{prod['price']:,.2f}", font=customtkinter.CTkFont(size=11, weight="bold"), text_color="#0f172a").grid(row=0, column=3, sticky="w", padx=6, pady=8)
 
             # Availability channels
-            avail_txt = "POS" if prod["in_store"] else ""
-            if prod["online"]:
+            avail_txt = "POS" if prod.get("in_store", True) else ""
+            if prod.get("online"):
                 avail_txt += " · Online" if avail_txt else "Online"
-            if prod["grabfood"]:
-                avail_txt += " · Grab" if avail_txt else "Grab"
             customtkinter.CTkLabel(r_frame, text=avail_txt or "Inactive", font=customtkinter.CTkFont(size=10), text_color="#64748b").grid(row=0, column=4, sticky="w", padx=6, pady=8)
 
             # Edit Button
@@ -380,7 +445,76 @@ class ProductManagementView(customtkinter.CTkFrame):
         self.populate_drawer(prod)
         self.render_product_list(query=self.search_entry.get().strip())
 
+    def load_product_image_preview(self, filename):
+        """Loads and updates the image preview in the editor drawer."""
+        self.current_image_filename = filename or "basta_LOGO.png"
+        img_path = os.path.join(project_root, "Designs", self.current_image_filename)
+
+        pil_img = None
+        if os.path.exists(img_path):
+            try:
+                pil_img = Image.open(img_path)
+            except Exception as e:
+                print(f"[BASTA PM] Error opening preview image: {e}")
+                pil_img = None
+        elif os.path.isabs(self.current_image_filename) and os.path.exists(self.current_image_filename):
+            try:
+                pil_img = Image.open(self.current_image_filename)
+            except Exception:
+                pil_img = None
+
+        if pil_img:
+            self.preview_ctk_image = customtkinter.CTkImage(light_image=pil_img, dark_image=pil_img, size=(160, 110))
+            self.img_preview_label.configure(image=self.preview_ctk_image, text="")
+        else:
+            logo_img = get_logo_image(size=(80, 80))
+            if logo_img:
+                self.preview_ctk_image = logo_img
+                self.img_preview_label.configure(image=self.preview_ctk_image, text="")
+            else:
+                self.preview_ctk_image = None
+                self.img_preview_label.configure(image=None, text="🍔\nNo Image", font=customtkinter.CTkFont(size=14))
+
+        # Update filename label
+        display_name = os.path.basename(self.current_image_filename) if self.current_image_filename else "Default Logo"
+        self.img_filename_label.configure(text=f"📷 {display_name}")
+
+    def choose_product_image(self):
+        """Opens Windows File Explorer for user to select an image file."""
+        file_types = [
+            ("Image files", "*.jpg;*.jpeg;*.png;*.webp;*.bmp;*.JPG;*.JPEG;*.PNG"),
+            ("JPEG files (*.jpg;*.jpeg)", "*.jpg;*.jpeg"),
+            ("PNG files (*.png)", "*.png"),
+            ("All files", "*.*")
+        ]
+        chosen_path = filedialog.askopenfilename(
+            title="Select Product Picture",
+            initialdir=os.path.join(project_root, "Designs"),
+            filetypes=file_types
+        )
+        if chosen_path:
+            designs_dir = os.path.join(project_root, "Designs")
+            os.makedirs(designs_dir, exist_ok=True)
+            filename = os.path.basename(chosen_path)
+            target_path = os.path.join(designs_dir, filename)
+
+            if os.path.abspath(chosen_path) != os.path.abspath(target_path):
+                try:
+                    shutil.copy2(chosen_path, target_path)
+                except Exception as e:
+                    print(f"[BASTA PM] Notice copying image file: {e}")
+
+            self.load_product_image_preview(filename)
+
+    def clear_product_image(self):
+        """Resets product image back to default logo."""
+        self.load_product_image_preview("basta_LOGO.png")
+
     def start_add_new_product(self):
+        if not self.is_admin():
+            messagebox.showwarning("Permission Denied", "Access Denied: Only Administrators are authorized to add new products.")
+            return
+
         self.selected_product = None
         self.is_creating_new = True
         self.editor_title_lbl.configure(text="+ ADD NEW PRODUCT")
@@ -398,7 +532,7 @@ class ProductManagementView(customtkinter.CTkFrame):
         self.low_stock_entry.insert(0, "10")
         self.in_store_switch.select()
         self.online_switch.select()
-        self.grabfood_switch.deselect()
+        self.load_product_image_preview("basta_LOGO.png")
         self.render_product_list(query=self.search_entry.get().strip())
 
     def populate_drawer(self, prod):
@@ -419,22 +553,27 @@ class ProductManagementView(customtkinter.CTkFrame):
         self.low_stock_entry.delete(0, "end")
         self.low_stock_entry.insert(0, str(prod["low_stock"]))
 
-        if prod["in_store"]:
+        if prod.get("in_store", True):
             self.in_store_switch.select()
         else:
             self.in_store_switch.deselect()
 
-        if prod["online"]:
+        if prod.get("online", False):
             self.online_switch.select()
         else:
             self.online_switch.deselect()
 
-        if prod["grabfood"]:
-            self.grabfood_switch.select()
-        else:
-            self.grabfood_switch.deselect()
+        self.load_product_image_preview(prod.get("image_filename", "basta_LOGO.png"))
 
     def save_current_product(self):
+        if (self.is_creating_new or not self.selected_product) and not self.is_admin():
+            messagebox.showwarning("Permission Denied", "Access Denied: Only Administrators are authorized to add new products.")
+            return
+
+        if not self.is_admin():
+            messagebox.showwarning("Permission Denied", "Access Denied: Only Administrators are authorized to modify products.")
+            return
+
         try:
             p_price = float(self.price_entry.get().strip())
         except ValueError:
@@ -455,6 +594,7 @@ class ProductManagementView(customtkinter.CTkFrame):
         p_name = self.name_entry.get().strip() or "Untitled Product"
         p_sku = self.sku_entry.get().strip() or "BUR-NEW"
         p_cat = self.category_combo.get()
+        p_img = self.current_image_filename or "basta_LOGO.png"
 
         if self.is_creating_new or not self.selected_product:
             new_id = len(self.products_data) + 1
@@ -462,7 +602,8 @@ class ProductManagementView(customtkinter.CTkFrame):
                 from database import add_product
                 db_id = add_product(
                     p_name, p_sku, p_cat, p_price, p_cost, p_stock, p_low,
-                    bool(self.in_store_switch.get()), bool(self.online_switch.get()), bool(self.grabfood_switch.get())
+                    bool(self.in_store_switch.get()), bool(self.online_switch.get()), False,
+                    image_filename=p_img
                 )
                 if db_id:
                     new_id = db_id
@@ -475,8 +616,9 @@ class ProductManagementView(customtkinter.CTkFrame):
                 "price": p_price, "cost_price": p_cost, "stock": p_stock, "low_stock": p_low,
                 "in_store": bool(self.in_store_switch.get()),
                 "online": bool(self.online_switch.get()),
-                "grabfood": bool(self.grabfood_switch.get()),
-                "status": "Active"
+                "grabfood": False,
+                "status": "Active",
+                "image_filename": p_img
             }
             self.products_data.append(new_prod)
             self.selected_product = new_prod
@@ -486,7 +628,8 @@ class ProductManagementView(customtkinter.CTkFrame):
                 from database import update_product
                 update_product(
                     self.selected_product["id"], p_name, p_sku, p_cat, p_price, p_cost, p_stock, p_low,
-                    bool(self.in_store_switch.get()), bool(self.online_switch.get()), bool(self.grabfood_switch.get())
+                    bool(self.in_store_switch.get()), bool(self.online_switch.get()), False,
+                    image_filename=p_img
                 )
             except Exception as e:
                 print(f"[BASTA DB] Product update notice: {e}")
@@ -496,17 +639,24 @@ class ProductManagementView(customtkinter.CTkFrame):
                 "price": p_price, "cost_price": p_cost, "stock": p_stock, "low_stock": p_low,
                 "in_store": bool(self.in_store_switch.get()),
                 "online": bool(self.online_switch.get()),
-                "grabfood": bool(self.grabfood_switch.get())
+                "grabfood": False,
+                "image_filename": p_img
             })
 
         self.populate_drawer(self.selected_product)
         self.render_product_list(query=self.search_entry.get().strip())
 
         # Notify main controller (POS) to synchronize immediately
-        if self.app_controller and hasattr(self.app_controller, "sync_products_from_management"):
-            self.app_controller.sync_products_from_management()
+        if self.app_controller:
+            if hasattr(self.app_controller, "sync_products_from_management"):
+                self.app_controller.sync_products_from_management()
+            if hasattr(self.app_controller, "render_product_cards"):
+                self.app_controller.render_product_cards()
 
     def delete_current_product(self):
+        if not self.is_admin():
+            messagebox.showwarning("Permission Denied", "Access Denied: Only Administrators are authorized to delete products.")
+            return
         if self.selected_product and self.selected_product in self.products_data:
             try:
                 from database import delete_product
@@ -519,9 +669,11 @@ class ProductManagementView(customtkinter.CTkFrame):
             self.populate_drawer(self.selected_product)
             self.render_product_list(query=self.search_entry.get().strip())
 
-            # Notify main controller (POS) to synchronize immediately
-            if self.app_controller and hasattr(self.app_controller, "sync_products_from_management"):
-                self.app_controller.sync_products_from_management()
+            if self.app_controller:
+                if hasattr(self.app_controller, "sync_products_from_management"):
+                    self.app_controller.sync_products_from_management()
+                if hasattr(self.app_controller, "render_product_cards"):
+                    self.app_controller.render_product_cards()
 
     def on_search(self, event=None):
         self.render_product_list(query=self.search_entry.get().strip())

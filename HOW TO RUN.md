@@ -122,9 +122,9 @@ This script will automatically:
 python ProjectMain/login.py
 ```
 Default accounts stored in the database:
-- **Administrator:** `admin` / `admin123` *(Chef Marco S.)*
-- **Cashier:** `cashier1` / `cashier123` *(Bea M.)*
-- Or log in with **any user account** created via **Account Settings** or **phpMyAdmin**. All accounts are verified dynamically against MySQL.
+- **Administrator:** `admin` / `admin123` *(Chef Marco S.)* $\rightarrow$ **Full Access:** Can access POS, Products, Stock, Reports, and Settings. Only Administrators can add, edit, or delete products and manage staff accounts.
+- **Cashier:** `cashier1` / `cashier123` *(Bea M.)* $\rightarrow$ **POS Only:** Can access the POS register to ring up items and process checkout. Administrative tabs (Products, Stock, Reports, Settings) are hidden and restricted.
+- Or log in with **any user account** created via **Account Settings** (roles are strictly **Administrator** or **Cashier**). All accounts are verified dynamically against MySQL.
 
 #### B. Direct POS & Navigation Launcher
 ```powershell
@@ -132,12 +132,12 @@ python ProjectMain/POS.py
 ```
 
 #### C. Direct Module Launchers (Quick Access)
-| Module | Command | Features |
+| Module | Command | Access & Features |
 |---|---|---|
-| **Product Management** | `python ProjectMain/product_management.py` | Add, edit, delete menu items, pricing & availability toggles |
-| **Inventory Overview** | `python ProjectMain/inventory_overview.py` | Ingredient levels, par thresholds, low-stock alerts, receive stock |
-| **Sales Reports** | `python ProjectMain/reports.py` | Daily, Weekly, Monthly, Yearly filters, bar chart, sales audit log |
-| **Account Settings** | `python ProjectMain/account_settings.py` | Staff & administrator management, add user, edit roles |
+| **Product Management** | `python ProjectMain/product_management.py` | **Admin Only:** Add, edit, delete menu items, pricing & photo picker |
+| **Inventory Overview** | `python ProjectMain/inventory_overview.py` | **Admin Only:** Ingredient levels, par thresholds, low-stock alerts, receive stock |
+| **Sales Reports** | `python ProjectMain/reports.py` | **Admin Only:** Daily, Weekly, Monthly, Yearly filters, bar chart, sales audit log |
+| **Account Settings** | `python ProjectMain/account_settings.py` | **Admin Only:** Staff accounts, add/edit Administrator & Cashier roles |
 
 ---
 
@@ -288,12 +288,48 @@ BASTA-POS-AND-INVENTORY-SYSTEM/
 │   ├── database.py                # MySQL connection manager & auto-initializer
 │   └── schema.sql                 # Standalone SQL schema for phpMyAdmin import
 │
-└── Designs/                       # Original Figma/Mockup UI designs and brand logo
+└── Designs/                       # Original Figma/Mockup UI designs and product photos
     ├── ADMIN_ACCOUNT SETTINGS.png
     ├── ADMIN_INVENTORY.png
     ├── ADMIN_PRODUCTMANAGEMENT.png
     ├── ADMIN_REPORTS.png
     ├── BASTA_RECEIPT.png
     ├── LOG-IN PAGE.png
-    └── basta_LOGO.png
+    ├── basta_LOGO.png
+    ├── BASTA_SMASHBURGER.jpg          # Basta Smash Burger photo
+    ├── BASTA_CRISPY CHICKEN SANDWICH.jpg # Crispy Chicken Sandwich photo
+    ├── BASTA_TRUFFLE FRIES.jpg        # Truffle Parm Fries photo
+    ├── BASTA_CALAMANSIWINGS.jpg       # Calamansi Glazed Wings photo
+    ├── BASTA_BOLOGNESE.jpg            # Slow-Braised Bolognese photo
+    ├── BASTA_CHARRED CAESAR.jpg       # Charred Caesar Salad photo
+    ├── BASTA_UBE MILKSHAKE.jpg        # Ube Milkshake photo
+    └── BASTA_SEASALT COOKIE.jpg       # Warm Sea Salt Choc Cookie photo
 ```
+
+---
+
+## 📸 Product Images & Database Reset
+
+### 1. Resetting Products to Default Verified Images
+To reset the MySQL products table to contain only the products that have verified pictures:
+```powershell
+python ProjectMain/database.py --reset-products
+```
+This resets the menu to the 8 official pictured items:
+- **Basta Smash Burger** (`BASTA_SMASHBURGER.jpg`) - ₱285.00
+- **Crispy Chicken Sandwich** (`BASTA_CRISPY CHICKEN SANDWICH.jpg`) - ₱220.00
+- **Truffle Parm Fries** (`BASTA_TRUFFLE FRIES.jpg`) - ₱145.00
+- **Calamansi Glazed Wings** (`BASTA_CALAMANSIWINGS.jpg`) - ₱249.00
+- **Slow-Braised Bolognese** (`BASTA_BOLOGNESE.jpg`) - ₱265.00
+- **Charred Caesar Salad** (`BASTA_CHARRED CAESAR.jpg`) - ₱185.00
+- **Ube Milkshake** (`BASTA_UBE MILKSHAKE.jpg`) - ₱165.00
+- **Warm Sea Salt Choc Cookie** (`BASTA_SEASALT COOKIE.jpg`) - ₱95.00
+
+### 2. Uploading & Applying Product Pictures in Product Management
+1. In the application, navigate to **📦 Products**.
+2. Select any product from the table (or click **+ Add Product**).
+3. In the right drawer under the photo preview, click **📁 Apply Picture**.
+4. Windows File Explorer will open. Select any image file (`.jpg`, `.png`, `.webp`).
+5. The image is previewed instantly and automatically copied to `Designs/` so it remains available across GitHub pulls.
+6. Click **✓ Save changes**. The new picture immediately updates in the database and reflects in the POS catalog cards!
+

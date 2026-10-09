@@ -782,17 +782,18 @@ class BastaLoginApp(ctk.CTk):
         super().destroy()
 
     def launch_pos_app(self):
-        """Transition from login screen to POS main screen."""
+        """Transition from login screen to POS main screen with authenticated role."""
         user_name = getattr(self, "logged_in_user_name", "Chef Marco Santos")
+        user_role = getattr(self, "logged_in_role", "Administrator")
         self.destroy()
         try:
             from POS import BastaPOSApp
-            pos_instance = BastaPOSApp(initial_view="pos", current_user=user_name)
+            pos_instance = BastaPOSApp(initial_view="pos", current_user=user_name, current_role=user_role)
             pos_instance.mainloop()
         except Exception:
             try:
                 from ProjectMain.POS import BastaPOSApp
-                pos_instance = BastaPOSApp(initial_view="pos", current_user=user_name)
+                pos_instance = BastaPOSApp(initial_view="pos", current_user=user_name, current_role=user_role)
                 pos_instance.mainloop()
             except Exception as error:
                 print(f"[BASTA POS] POS launch error: {error}")

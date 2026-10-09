@@ -67,140 +67,16 @@ class PaymentCompleteWindow(customtkinter.CTkToplevel):
         }
 
         self.title("BASTA POS - Payment Complete")
-        self.geometry("1280x780")
-        self.minsize(1050, 680)
+        self.geometry("1180x760")
+        self.minsize(980, 650)
 
-        # Configure root grid weights for responsiveness
+        # Configure root grid weights for responsiveness (2 columns: left confirmation, right tablet receipt)
         self.grid_rowconfigure(0, weight=1)
-        self.grid_columnconfigure(0, weight=0)  # Left sidebar
-        self.grid_columnconfigure(1, weight=3)  # Center confirmation panel
-        self.grid_columnconfigure(2, weight=2)  # Right tablet receipt panel
+        self.grid_columnconfigure(0, weight=3)  # Left confirmation panel
+        self.grid_columnconfigure(1, weight=2)  # Right tablet receipt panel
 
-        self._build_sidebar()
         self._build_confirmation_panel()
         self._build_tablet_receipt_panel()
-
-    def _build_sidebar(self):
-        sidebar_frame = customtkinter.CTkFrame(
-            self,
-            width=110,
-            corner_radius=0,
-            fg_color="#09090b"
-        )
-        sidebar_frame.grid(row=0, column=0, sticky="nsew")
-        sidebar_frame.grid_propagate(False)
-        sidebar_frame.grid_rowconfigure(7, weight=1)
-
-        # Brand / Logo Header using basta_LOGO.png
-        sidebar_logo_img = get_logo_image(size=(52, 52))
-        if sidebar_logo_img:
-            logo_label = customtkinter.CTkLabel(
-                sidebar_frame,
-                image=sidebar_logo_img,
-                text=""
-            )
-            logo_label.grid(row=0, column=0, padx=10, pady=(20, 2))
-
-            brand_label = customtkinter.CTkLabel(
-                sidebar_frame,
-                text="BASTA POS",
-                font=customtkinter.CTkFont(size=12, weight="bold"),
-                text_color="#f8fafc"
-            )
-            brand_label.grid(row=1, column=0, padx=10, pady=(0, 20))
-        else:
-            brand_label = customtkinter.CTkLabel(
-                sidebar_frame,
-                text="🍔\nBASTA\nPOS",
-                font=customtkinter.CTkFont(size=14, weight="bold"),
-                text_color="#f8fafc"
-            )
-            brand_label.grid(row=0, column=0, padx=10, pady=(25, 30))
-
-        # Nav items
-        pos_nav_btn = customtkinter.CTkButton(
-            sidebar_frame,
-            text="⊞\nPOS",
-            width=70,
-            height=60,
-            corner_radius=14,
-            font=customtkinter.CTkFont(size=12, weight="bold"),
-            fg_color="#10b981",
-            text_color="#ffffff",
-            hover_color="#059669"
-        )
-        pos_nav_btn.grid(row=2, column=0, padx=15, pady=6)
-
-        products_nav_btn = customtkinter.CTkButton(
-            sidebar_frame,
-            text="📦\nProducts",
-            width=70,
-            height=50,
-            corner_radius=10,
-            font=customtkinter.CTkFont(size=11),
-            fg_color="transparent",
-            text_color="#9ca3af",
-            hover_color="#1f2937",
-            command=self.open_products_screen
-        )
-        products_nav_btn.grid(row=3, column=0, padx=15, pady=6)
-
-        stock_nav_btn = customtkinter.CTkButton(
-            sidebar_frame,
-            text="📋\nStock",
-            width=70,
-            height=50,
-            corner_radius=10,
-            font=customtkinter.CTkFont(size=11),
-            fg_color="transparent",
-            text_color="#9ca3af",
-            hover_color="#1f2937",
-            command=self.open_inventory_screen
-        )
-        stock_nav_btn.grid(row=4, column=0, padx=15, pady=6)
-
-        tx_nav_btn = customtkinter.CTkButton(
-            sidebar_frame,
-            text="📊\nReports",
-            width=70,
-            height=50,
-            corner_radius=10,
-            font=customtkinter.CTkFont(size=11),
-            fg_color="transparent",
-            text_color="#9ca3af",
-            hover_color="#1f2937",
-            command=self.open_reports_screen
-        )
-        tx_nav_btn.grid(row=5, column=0, padx=15, pady=6)
-
-        settings_nav_btn = customtkinter.CTkButton(
-            sidebar_frame,
-            text="⚙\nSettings",
-            width=70,
-            height=50,
-            corner_radius=10,
-            font=customtkinter.CTkFont(size=11),
-            fg_color="transparent",
-            text_color="#9ca3af",
-            hover_color="#1f2937",
-            command=self.open_accounts_screen
-        )
-        settings_nav_btn.grid(row=6, column=0, padx=15, pady=6)
-
-        # Logout at bottom
-        logout_btn = customtkinter.CTkButton(
-            sidebar_frame,
-            text="➔\nLogout",
-            width=70,
-            height=50,
-            corner_radius=10,
-            font=customtkinter.CTkFont(size=11),
-            fg_color="transparent",
-            text_color="#9ca3af",
-            hover_color="#1f2937",
-            command=self.handle_logout
-        )
-        logout_btn.grid(row=8, column=0, padx=15, pady=(10, 25))
 
     def _build_confirmation_panel(self):
         center_scroll = customtkinter.CTkScrollableFrame(
@@ -210,7 +86,7 @@ class PaymentCompleteWindow(customtkinter.CTkToplevel):
             border_width=1,
             border_color="#e2e8f0"
         )
-        center_scroll.grid(row=0, column=1, sticky="nsew", padx=20, pady=20)
+        center_scroll.grid(row=0, column=0, sticky="nsew", padx=20, pady=20)
         center_scroll.grid_columnconfigure(0, weight=1)
 
         # Header Titles with generous rounded spacing
@@ -399,7 +275,7 @@ class PaymentCompleteWindow(customtkinter.CTkToplevel):
             fg_color="#f1f5f9",
             corner_radius=0
         )
-        tablet_container.grid(row=0, column=2, sticky="nsew", padx=(0, 20), pady=20)
+        tablet_container.grid(row=0, column=1, sticky="nsew", padx=(0, 20), pady=20)
         tablet_container.grid_rowconfigure(0, weight=1)
         tablet_container.grid_columnconfigure(0, weight=1)
 
@@ -640,11 +516,13 @@ class PaymentCompleteWindow(customtkinter.CTkToplevel):
 class BastaPOSApp(customtkinter.CTk):
     """Main POS Application window recreation with full interactivity and responsiveness."""
 
-    def __init__(self, initial_view="pos", current_user="Chef Marco S."):
+    def __init__(self, initial_view="pos", current_user="Chef Marco S.", current_role="Administrator"):
         super().__init__()
 
         self.initial_view = initial_view
         self.current_user = current_user
+        self.current_role = current_role
+        self.is_admin = (str(self.current_role).strip().lower() in ["admin", "administrator"])
         self.order_counter = 1048
         self.title("BASTA POS")
         self.geometry("1440x880")
@@ -656,6 +534,7 @@ class BastaPOSApp(customtkinter.CTk):
         # Preload reusable CTkImages for fast rendering
         self.sidebar_logo_img = get_logo_image(size=(52, 52))
         self.product_placeholder_img = get_logo_image(size=(105, 75))
+        self.cached_product_images = {}
 
         # Products catalog data (dynamically populated from ProductManagementView)
         self.catalog_products = []
@@ -772,8 +651,6 @@ class BastaPOSApp(customtkinter.CTk):
             hover_color="#1f2937",
             command=lambda: self.switch_view("products")
         )
-        self.products_nav_btn.grid(row=3, column=0, padx=15, pady=6)
-
         self.stock_nav_btn = customtkinter.CTkButton(
             sidebar_frame,
             text="📋\nStock",
@@ -786,7 +663,6 @@ class BastaPOSApp(customtkinter.CTk):
             hover_color="#1f2937",
             command=lambda: self.switch_view("stock")
         )
-        self.stock_nav_btn.grid(row=4, column=0, padx=15, pady=6)
 
         self.reports_nav_btn = customtkinter.CTkButton(
             sidebar_frame,
@@ -800,7 +676,6 @@ class BastaPOSApp(customtkinter.CTk):
             hover_color="#1f2937",
             command=lambda: self.switch_view("reports")
         )
-        self.reports_nav_btn.grid(row=5, column=0, padx=15, pady=6)
 
         self.settings_nav_btn = customtkinter.CTkButton(
             sidebar_frame,
@@ -814,7 +689,12 @@ class BastaPOSApp(customtkinter.CTk):
             hover_color="#1f2937",
             command=lambda: self.switch_view("settings")
         )
-        self.settings_nav_btn.grid(row=6, column=0, padx=15, pady=6)
+
+        if self.is_admin:
+            self.products_nav_btn.grid(row=3, column=0, padx=15, pady=6)
+            self.stock_nav_btn.grid(row=4, column=0, padx=15, pady=6)
+            self.reports_nav_btn.grid(row=5, column=0, padx=15, pady=6)
+            self.settings_nav_btn.grid(row=6, column=0, padx=15, pady=6)
 
         # Logout at bottom
         logout_btn = customtkinter.CTkButton(
@@ -833,6 +713,11 @@ class BastaPOSApp(customtkinter.CTk):
 
     def switch_view(self, view_name):
         """Switches the active view inside the main window seamlessly."""
+        if not self.is_admin and view_name != "pos":
+            from tkinter import messagebox
+            messagebox.showwarning("Access Restricted", "Access Denied: Cashiers are authorized to access the POS only.")
+            return
+
         self.current_view_name = view_name
 
         # Hide all views
@@ -911,6 +796,31 @@ class BastaPOSApp(customtkinter.CTk):
             )
             self.title("BASTA POS - Account Settings")
 
+    def get_cached_product_image(self, image_filename, size=(160, 95)):
+        """Retrieve or cache CTkImage for a product photo from Designs folder."""
+        if not image_filename:
+            return self.product_placeholder_img
+
+        cache_key = (image_filename, size)
+        if cache_key in self.cached_product_images:
+            return self.cached_product_images[cache_key]
+
+        # Determine path
+        img_path = os.path.join(project_root, "Designs", image_filename)
+        if not os.path.exists(img_path) and os.path.isabs(image_filename) and os.path.exists(image_filename):
+            img_path = image_filename
+
+        if os.path.exists(img_path):
+            try:
+                pil_img = Image.open(img_path)
+                ctk_img = customtkinter.CTkImage(light_image=pil_img, dark_image=pil_img, size=size)
+                self.cached_product_images[cache_key] = ctk_img
+                return ctk_img
+            except Exception as e:
+                print(f"[BASTA POS] Warning loading product image {image_filename}: {e}")
+
+        return self.product_placeholder_img
+
     def sync_products_from_management(self):
         """Dynamically synchronize POS catalog with products from Product Management."""
         category_icons = {
@@ -941,7 +851,8 @@ class BastaPOSApp(customtkinter.CTk):
                         "sub": f"{cat} · {stock_qty} left",
                         "price": float(prod.get("price", 0.0)),
                         "icon": icon,
-                        "stock": stock_qty
+                        "stock": stock_qty,
+                        "image_filename": prod.get("image_filename", "basta_LOGO.png")
                     })
             if synced_catalog:
                 self.catalog_products = synced_catalog
@@ -1008,9 +919,10 @@ class BastaPOSApp(customtkinter.CTk):
         )
         greeting_label.grid(row=0, column=0, sticky="w")
 
+        role_tag = f"Role: {self.current_role} · " if hasattr(self, "current_role") and self.current_role else ""
         date_label = customtkinter.CTkLabel(
             header_frame,
-            text=datetime.now().strftime("%A, %B %d, %Y"),
+            text=f"{role_tag}{datetime.now().strftime('%A, %B %d, %Y')}",
             font=customtkinter.CTkFont(size=13),
             text_color="#64748b"
         )
@@ -1120,17 +1032,18 @@ class BastaPOSApp(customtkinter.CTk):
             img_box.grid(row=0, column=0, padx=8, pady=(8, 6), sticky="nsew")
             img_box.grid_propagate(False)
 
-            if self.product_placeholder_img:
+            prod_img = self.get_cached_product_image(product.get("image_filename"), size=(160, 95))
+            if prod_img:
                 img_label = customtkinter.CTkLabel(
                     img_box,
-                    image=self.product_placeholder_img,
+                    image=prod_img,
                     text=""
                 )
                 img_label.place(relx=0.5, rely=0.5, anchor="center")
             else:
                 img_icon = customtkinter.CTkLabel(
                     img_box,
-                    text=product["icon"],
+                    text=product.get("icon", "🍔"),
                     font=customtkinter.CTkFont(size=38)
                 )
                 img_icon.place(relx=0.5, rely=0.5, anchor="center")
@@ -1674,17 +1587,17 @@ class BastaPOSApp(customtkinter.CTk):
             return self.calculated_total
 
         if not hasattr(self, "cash_tendered_entry"):
-            return self.calculated_total
+            return 0.0
 
         raw_val = self.cash_tendered_entry.get().strip().replace("₱", "").replace(",", "")
         if not raw_val:
-            return self.calculated_total
+            return 0.0
 
         try:
             val = float(raw_val)
             return max(0.0, val)
         except ValueError:
-            return self.calculated_total
+            return 0.0
 
     def on_search_change(self, event=None):
         """Filter product cards as query changes."""
@@ -1709,25 +1622,75 @@ class BastaPOSApp(customtkinter.CTk):
 
     def open_payment_complete_window(self):
         """Open the pop-up receipt window (BastaReceiptWindow) with active order data and process sale."""
+        from tkinter import messagebox
+
         if not self.cart_items:
             print("[BASTA POS] Cannot checkout: Cart is empty.")
+            messagebox.showwarning("Cart Empty", "Cannot checkout: The cart is empty. Please add items to order first.")
             if hasattr(self, "change_due_label"):
                 self.change_due_label.configure(text="Cart is empty", text_color="#dc2626")
             return
 
-        # Determine actual cash received and validate cash sufficiency
-        cash_rec = self.get_cash_received_amount()
-        if self.active_payment_method == "Cash" and cash_rec < self.calculated_total:
-            shortage = self.calculated_total - cash_rec
-            print(f"[BASTA POS] Cannot checkout: Cash received (₱{cash_rec:,.2f}) is short by ₱{shortage:,.2f}.")
-            if hasattr(self, "change_due_label"):
-                self.change_due_label.configure(
-                    text=f"Short: ₱{shortage:,.2f}",
-                    text_color="#dc2626"
-                )
+        # Validate cash amount when customer chooses Cash payment
+        if self.active_payment_method == "Cash":
+            raw_cash = ""
             if hasattr(self, "cash_tendered_entry"):
-                self.cash_tendered_entry.focus()
-            return
+                raw_cash = self.cash_tendered_entry.get().strip().replace("₱", "").replace(",", "")
+
+            if not raw_cash:
+                print("[BASTA POS] Cannot checkout: Cash amount was not entered.")
+                messagebox.showwarning(
+                    "Cash Amount Required",
+                    "Please enter the cash amount given by the customer before checking out.\n\n"
+                    "You can type the amount or click 'Exact' / preset bills (₱200, ₱500, ₱1,000, etc.)."
+                )
+                if hasattr(self, "change_due_label"):
+                    self.change_due_label.configure(
+                        text="Enter cash amount!",
+                        text_color="#dc2626"
+                    )
+                if hasattr(self, "cash_tendered_entry"):
+                    self.cash_tendered_entry.focus()
+                return
+
+            try:
+                cash_rec = float(raw_cash)
+                if cash_rec <= 0:
+                    raise ValueError("Amount must be greater than zero.")
+            except ValueError:
+                print("[BASTA POS] Cannot checkout: Invalid cash amount.")
+                messagebox.showwarning(
+                    "Invalid Cash Amount",
+                    "Please enter a valid numeric cash amount greater than zero."
+                )
+                if hasattr(self, "change_due_label"):
+                    self.change_due_label.configure(
+                        text="Invalid amount",
+                        text_color="#dc2626"
+                    )
+                if hasattr(self, "cash_tendered_entry"):
+                    self.cash_tendered_entry.focus()
+                return
+
+            if cash_rec < self.calculated_total:
+                shortage = self.calculated_total - cash_rec
+                print(f"[BASTA POS] Cannot checkout: Cash received (PHP {cash_rec:,.2f}) is short by PHP {shortage:,.2f}.")
+                messagebox.showwarning(
+                    "Insufficient Cash",
+                    f"Cash received (₱{cash_rec:,.2f}) is short by ₱{shortage:,.2f}.\n\n"
+                    f"Order Total: ₱{self.calculated_total:,.2f}\n"
+                    f"Cash Given:  ₱{cash_rec:,.2f}"
+                )
+                if hasattr(self, "change_due_label"):
+                    self.change_due_label.configure(
+                        text=f"Short: ₱{shortage:,.2f}",
+                        text_color="#dc2626"
+                    )
+                if hasattr(self, "cash_tendered_entry"):
+                    self.cash_tendered_entry.focus()
+                return
+        else:
+            cash_rec = self.calculated_total
 
         chg_due = max(0.0, cash_rec - self.calculated_total)
 
