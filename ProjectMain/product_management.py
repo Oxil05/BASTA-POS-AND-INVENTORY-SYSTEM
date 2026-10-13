@@ -8,6 +8,8 @@ All variables and functions strictly use snake_case.
 import os
 import sys
 import shutil
+import csv
+from datetime import datetime
 from tkinter import filedialog, messagebox
 from PIL import Image
 import customtkinter
@@ -166,11 +168,41 @@ class ProductManagementView(customtkinter.CTkFrame):
             header_info, text="Configure product catalog, adjust pricing, and track availability", font=customtkinter.CTkFont(size=12), text_color="#64748b"
         ).pack(anchor="w")
 
+        header_actions = customtkinter.CTkFrame(header_bar, fg_color="transparent")
+        header_actions.grid(row=0, column=1, sticky="e")
+
+        self.print_btn = customtkinter.CTkButton(
+            header_actions,
+            text="⎙ Print Report",
+            font=customtkinter.CTkFont(size=12, weight="bold"),
+            fg_color="#10b981",
+            hover_color="#059669",
+            height=38,
+            corner_radius=10,
+            command=self.handle_print_report
+        )
+        self.print_btn.pack(side="left", padx=4)
+
+        self.export_btn = customtkinter.CTkButton(
+            header_actions,
+            text="⤓ Export CSV",
+            font=customtkinter.CTkFont(size=12),
+            fg_color="#ffffff",
+            text_color="#0f172a",
+            hover_color="#f1f5f9",
+            border_width=1,
+            border_color="#cbd5e1",
+            height=38,
+            corner_radius=10,
+            command=self.handle_export_csv
+        )
+        self.export_btn.pack(side="left", padx=4)
+
         add_btn_text = "+ Add Product" if self.is_admin() else "🔒 Add Product (Admin Only)"
         add_btn_fg = "#10b981" if self.is_admin() else "#94a3b8"
         add_btn_hover = "#059669" if self.is_admin() else "#94a3b8"
         self.add_btn = customtkinter.CTkButton(
-            header_bar,
+            header_actions,
             text=add_btn_text,
             font=customtkinter.CTkFont(size=12, weight="bold"),
             fg_color=add_btn_fg,
@@ -179,7 +211,7 @@ class ProductManagementView(customtkinter.CTkFrame):
             corner_radius=10,
             command=self.start_add_new_product
         )
-        self.add_btn.grid(row=0, column=1, sticky="e")
+        self.add_btn.pack(side="left", padx=4)
 
         # 2. Key Metrics Row
         metrics_frame = customtkinter.CTkFrame(self.main_scroll, fg_color="transparent")
@@ -677,6 +709,128 @@ class ProductManagementView(customtkinter.CTkFrame):
 
     def on_search(self, event=None):
         self.render_product_list(query=self.search_entry.get().strip())
+
+    def handle_print_report(self):
+        """Generates formatted product catalog and stock report text, sends to printer/Notepad, and notifies user."""
+        now_str = datetime.now().strftime("%d %b %Y - %I:%M %p")
+        lines = [
+            "=" * 70,
+            "                   BASTA BURGER - POS                   ",
+            "             PRODUCT CATALOG & PRICING REPORT           ",
+            "=" * 70,
+            f"Generated On: {now_str}",
+            "-" * 70,
+            f"{'SKU':<10}{'PRODUCT NAME':<26}{'CATEGORY':<14}{'PRICE':>8}{'STOCK':>6}{'STATUS':>6}",
+            "-" * 70,
+        ]
+
+        for p in self.products_data:
+            sku = p.get("sku", "")
+            name = p.get("name", "")
+            cat = p.get("category", "")
+            price = float(p.get("price", 0.0))
+            stk = int(p.get("stock", 0))
+            st = p.get("status", "Active")
+            lines.append(f"{sku:<10}{name[:24]:<26}{cat[:12]:<14}{price:>8,.2f}{stk:>6}{st:>6}")
+
+        lines.extend([
+            "=" * 70,
+            f"Total Products Cataloged: {len(self.products_data)}",
+            "=" * 70
+        ])
+        report_text = "\n".join(lines)
+
+        reports_dir = os.path.join(project_root, "Reports")
+        os.makedirs(reports_dir, exist_ok=True)
+        safe_time = datetime.now().strftime("%Y%m%d_%H%M%S")
+        file_path = os.path.join(reports_dir, f"Products_Catalog_{safe_time}.txt")
+        try:
+            with open(file_path, "w", encoding="utf-8") as f:
+                f.write(report_text)
+        except Exception as err:
+            print(f"[BASTA POS] Failed to save products report: {err}")
+
+        if hasattr(self, "print_btn"):
+            self.print_btn.configure(text="✓ Printed!", fg_color="#059669")
+            self.after(2000, lambda: self.print_btn.configure(text="⎙ Print Report", fg_color="#10b981"))
+
+        if os.path.exists(file_path):
+            try:
+                os.startfile(file_path, "print")
+            except Exception:
+                try:
+                    os.startfile(file_path)
+                except Exception as open_err:
+                    print(f"[BASTA POS] Could not open file: {open_err}")
+
+        try:
+            messagebox.showinfo(
+                "Print Products Report",
+                f"Product catalog report sent to printer!\n\nSaved to:\nReports/{os.path.basename(file_path)}"
+            )
+        except Exception:
+            pass
+
+    def handle_export_csv(self):
+        """Exports the full products catalog and stock data to a CSV spreadsheet."""
+        default_filename = f"Products_Catalog_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+        initial_dir = os.path.join(project_root, "Exports")
+        os.makedirs(initial_dir, exist_ok=True)
+
+        file_path = filedialog.asksaveasfilename(
+            initialdir=initial_dir,
+            initialfile=default_filename,
+            defaultextension=".csv",
+            filetypes=[("CSV files", "*.csv"), ("All files", "*.*")]
+        )
+        if not file_path:
+            return
+
+        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        try:
+            with open(file_path, mode="w", newline="", encoding="utf-8-sig") as csv_file:
+                writer = csv.writer(csv_file)
+
+                # Header
+                writer.writerow(["BASTA BURGER - PRODUCT MANAGEMENT CATALOG"])
+                writer.writerow(["Export Timestamp", now_str])
+                writer.writerow([])
+
+                # Products Table
+                writer.writerow(["ID", "SKU", "Product Name", "Category", "Selling Price (PHP)", "Cost Price (PHP)", "Current Stock", "Low Stock Threshold", "In-Store Available", "Online Ordering", "Status", "Image Filename"])
+                for p in self.products_data:
+                    writer.writerow([
+                        p.get("id", ""),
+                        p.get("sku", ""),
+                        p.get("name", ""),
+                        p.get("category", ""),
+                        f"{float(p.get('price', 0.0)):,.2f}",
+                        f"{float(p.get('cost_price', 0.0)):,.2f}",
+                        p.get("stock", 0),
+                        p.get("low_stock", 10),
+                        "Yes" if p.get("in_store", True) else "No",
+                        "Yes" if p.get("online", True) else "No",
+                        p.get("status", "Active"),
+                        p.get("image_filename", "")
+                    ])
+
+            if hasattr(self, "export_btn"):
+                self.export_btn.configure(text="✓ Exported!", fg_color="#10b981", text_color="#ffffff")
+                self.after(2000, lambda: self.export_btn.configure(text="⤓ Export CSV", fg_color="#ffffff", text_color="#0f172a"))
+
+            res = messagebox.askyesno(
+                "Export Successful",
+                f"Product catalog successfully exported to:\n{file_path}\n\nWould you like to open the CSV file now?"
+            )
+            if res:
+                try:
+                    os.startfile(file_path)
+                except Exception as open_err:
+                    print(f"[BASTA POS] Could not open CSV file: {open_err}")
+
+        except Exception as err:
+            messagebox.showerror("Export Error", f"Failed to export CSV:\n{err}")
 
 
 class ProductManagementApp:

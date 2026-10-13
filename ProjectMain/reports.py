@@ -7,6 +7,8 @@ All variables and functions strictly use snake_case.
 
 import os
 import sys
+import csv
+from datetime import datetime
 from PIL import Image
 import customtkinter
 
@@ -169,18 +171,19 @@ class ReportsView(customtkinter.CTkFrame):
         )
         self.date_range_pill.pack(side="left", padx=4)
 
-        print_btn = customtkinter.CTkButton(
+        self.print_btn = customtkinter.CTkButton(
             filter_box,
             text="⎙ Print Report",
             font=customtkinter.CTkFont(size=11, weight="bold"),
             fg_color="#10b981",
             hover_color="#059669",
             height=34,
-            corner_radius=8
+            corner_radius=8,
+            command=self.handle_print_report
         )
-        print_btn.pack(side="left", padx=4)
+        self.print_btn.pack(side="left", padx=4)
 
-        export_btn = customtkinter.CTkButton(
+        self.export_btn = customtkinter.CTkButton(
             filter_box,
             text="⤓ Export CSV",
             font=customtkinter.CTkFont(size=11),
@@ -190,9 +193,10 @@ class ReportsView(customtkinter.CTkFrame):
             border_width=1,
             border_color="#cbd5e1",
             height=34,
-            corner_radius=8
+            corner_radius=8,
+            command=self.handle_export_csv
         )
-        export_btn.pack(side="left", padx=4)
+        self.export_btn.pack(side="left", padx=4)
 
         # 2. Key Metrics Row (4 Dark Cards)
         self.metrics_container = customtkinter.CTkFrame(main_scroll, fg_color="transparent")
@@ -413,6 +417,177 @@ class ReportsView(customtkinter.CTkFrame):
         self.date_range_pill.configure(text=self.period_data[period_name]["date_label"])
         self.render_metric_cards()
         self.render_bar_chart()
+
+    def handle_print_report(self):
+        """Generates formatted sales report text, sends to printer/Notepad, and notifies user."""
+        period_info = self.period_data[self.active_period]
+        date_lbl = period_info.get("date_label", self.active_period)
+        now_str = datetime.now().strftime("%d %b %Y - %I:%M %p")
+
+        lines = [
+            "=" * 60,
+            "                   BASTA BURGER - POS                   ",
+            "             SALES & PERFORMANCE REPORT                 ",
+            "=" * 60,
+            f"Report Period : {self.active_period} ({date_lbl})",
+            f"Generated On  : {now_str}",
+            "-" * 60,
+            "1. KEY PERFORMANCE METRICS",
+            "-" * 60,
+        ]
+
+        for m in period_info.get("metrics", []):
+            lines.append(f"  {m['title']:<30} : {m['val']} ({m['diff']})")
+
+        lines.extend([
+            "-" * 60,
+            "2. PERIOD REVENUE BREAKDOWN",
+            "-" * 60,
+        ])
+        for b_lbl, b_val in period_info.get("bars", []):
+            lines.append(f"  {b_lbl:<20} : PHP {b_val:>12,.2f}")
+
+        lines.extend([
+            "-" * 60,
+            "3. TOP SELLING PRODUCTS",
+            "-" * 60,
+            f"{'RANK':<6}{'PRODUCT NAME':<32}{'SOLD':<12}{'REVENUE':>10}",
+            "-" * 60,
+            f"{'#1':<6}{'Classic Basta Smash Burger':<32}{'142 sold':<12}{'PHP 26,838':>10}",
+            f"{'#2':<6}{'Truffle Mushroom Cheeseburger':<32}{'86 sold':<12}{'PHP 21,414':>10}",
+            f"{'#3':<6}{'Crispy Golden Fries':<32}{'118 sold':<12}{'PHP  9,322':>10}",
+            f"{'#4':<6}{'Ube Shake Special':<32}{'74 sold':<12}{'PHP  8,880':>10}",
+            f"{'#5':<6}{'Spicy BBQ Bacon Deluxe':<32}{'36 sold':<12}{'PHP  8,244':>10}",
+            "-" * 60,
+            "4. RECENT TRANSACTIONS AUDIT LOG",
+            "-" * 60,
+            f"{'TXN ID':<16}{'ORDER #':<10}{'TIME':<18}{'PAY':<8}{'TOTAL':>10}",
+            "-" * 60,
+        ])
+
+        for tx in self.transactions_data[:15]:
+            t_id, ord_id, t_time, itm, pay, cash, tot = tx
+            lines.append(f"{t_id:<16}{ord_id:<10}{t_time:<18}{pay:<8}{tot:>10}")
+
+        lines.extend([
+            "=" * 60,
+            "               END OF SALES REPORT                     ",
+            "=" * 60
+        ])
+        report_text = "\n".join(lines)
+
+        reports_dir = os.path.join(project_root, "Reports")
+        os.makedirs(reports_dir, exist_ok=True)
+        safe_time = datetime.now().strftime("%Y%m%d_%H%M%S")
+        file_path = os.path.join(reports_dir, f"Sales_Report_{self.active_period}_{safe_time}.txt")
+        try:
+            with open(file_path, "w", encoding="utf-8") as f:
+                f.write(report_text)
+        except Exception as err:
+            print(f"[BASTA POS] Failed to save report text: {err}")
+
+        if hasattr(self, "print_btn"):
+            self.print_btn.configure(text="✓ Printed!", fg_color="#059669")
+            self.after(2000, lambda: self.print_btn.configure(text="⎙ Print Report", fg_color="#10b981"))
+
+        if os.path.exists(file_path):
+            try:
+                os.startfile(file_path, "print")
+            except Exception:
+                try:
+                    os.startfile(file_path)
+                except Exception as open_err:
+                    print(f"[BASTA POS] Could not open report: {open_err}")
+
+        try:
+            from tkinter import messagebox
+            messagebox.showinfo(
+                "Print Report",
+                f"Sales Report ({self.active_period}) sent to printer!\n\nSaved to: Reports/{os.path.basename(file_path)}"
+            )
+        except Exception:
+            pass
+
+    def handle_export_csv(self):
+        """Exports the sales report and transactions log to a CSV file."""
+        from tkinter import filedialog, messagebox
+
+        default_filename = f"Sales_Report_{self.active_period}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+        initial_dir = os.path.join(project_root, "Exports")
+        os.makedirs(initial_dir, exist_ok=True)
+
+        file_path = filedialog.asksaveasfilename(
+            initialdir=initial_dir,
+            initialfile=default_filename,
+            defaultextension=".csv",
+            filetypes=[("CSV files", "*.csv"), ("All files", "*.*")]
+        )
+        if not file_path:
+            return
+
+        period_info = self.period_data[self.active_period]
+        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        try:
+            with open(file_path, mode="w", newline="", encoding="utf-8-sig") as csv_file:
+                writer = csv.writer(csv_file)
+
+                # Header Information
+                writer.writerow(["BASTA BURGER - SALES & PERFORMANCE REPORT"])
+                writer.writerow(["Report Period", self.active_period, period_info.get("date_label", "")])
+                writer.writerow(["Generated Timestamp", now_str])
+                writer.writerow([])
+
+                # Key Metrics
+                writer.writerow(["--- KEY PERFORMANCE METRICS ---"])
+                writer.writerow(["Metric Title", "Value", "Comparison / Growth"])
+                for m in period_info.get("metrics", []):
+                    writer.writerow([m["title"], m["val"], m["diff"]])
+                writer.writerow([])
+
+                # Period Revenue Breakdown
+                writer.writerow(["--- PERIOD REVENUE BREAKDOWN ---"])
+                writer.writerow(["Time / Date Interval", "Revenue (PHP)"])
+                for b_lbl, b_val in period_info.get("bars", []):
+                    writer.writerow([b_lbl, f"{b_val:,.2f}"])
+                writer.writerow([])
+
+                # Top Selling Products
+                writer.writerow(["--- TOP SELLING PRODUCTS ---"])
+                writer.writerow(["Rank", "Product Name", "Units Sold", "Revenue"])
+                top_products = [
+                    ("#1", "Classic Basta Smash Burger", "142 sold", "₱26,838"),
+                    ("#2", "Truffle Mushroom Cheeseburger", "86 sold", "₱21,414"),
+                    ("#3", "Crispy Golden Fries", "118 sold", "₱9,322"),
+                    ("#4", "Ube Shake Special", "74 sold", "₱8,880"),
+                    ("#5", "Spicy BBQ Bacon Deluxe", "36 sold", "₱8,244")
+                ]
+                for p in top_products:
+                    writer.writerow(p)
+                writer.writerow([])
+
+                # Transactions Audit Log
+                writer.writerow(["--- TRANSACTIONS AUDIT LOG ---"])
+                writer.writerow(["Transaction ID", "Order ID", "Date / Time", "Items Purchased", "Payment Method", "Cashier", "Total Amount"])
+                for tx in self.transactions_data:
+                    writer.writerow(tx)
+
+            if hasattr(self, "export_btn"):
+                self.export_btn.configure(text="✓ Exported!", fg_color="#10b981", text_color="#ffffff")
+                self.after(2000, lambda: self.export_btn.configure(text="⤓ Export CSV", fg_color="#ffffff", text_color="#0f172a"))
+
+            res = messagebox.askyesno(
+                "Export Successful",
+                f"Sales report successfully exported to:\n{file_path}\n\nWould you like to open the CSV file now?"
+            )
+            if res:
+                try:
+                    os.startfile(file_path)
+                except Exception as open_err:
+                    print(f"[BASTA POS] Could not open CSV file: {open_err}")
+
+        except Exception as err:
+            messagebox.showerror("Export Error", f"Failed to export CSV:\n{err}")
 
 
 class ReportsApp:

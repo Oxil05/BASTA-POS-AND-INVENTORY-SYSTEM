@@ -231,6 +231,10 @@ class BastaLoginApp(ctk.CTk):
     Recreates the modern split-screen design from Designs/LOG-IN PAGE.png.
     """
 
+    def _windows_set_titlebar_color(self, color_mode=None):
+        """No-op to eliminate asynchronous window withdrawal and focus race conditions on Windows."""
+        pass
+
     def __init__(self):
         super().__init__()
         
@@ -779,24 +783,40 @@ class BastaLoginApp(ctk.CTk):
                     pass
         except Exception:
             pass
-        super().destroy()
+        try:
+            super().destroy()
+        except Exception:
+            pass
+
+    def reset_login_fields(self):
+        """Clears sensitive credentials and resets UI state when user logs out of POS."""
+        if hasattr(self, "email_entry"):
+            self.email_entry.delete(0, "end")
+        if hasattr(self, "password_entry"):
+            self.password_entry.delete(0, "end")
+        if hasattr(self, "status_message_label"):
+            self.status_message_label.configure(
+                text="Logged out successfully. Please sign in to continue.",
+                text_color="#16A34A"
+            )
+        if hasattr(self, "email_entry"):
+            self.email_entry.focus()
 
     def launch_pos_app(self):
         """Transition from login screen to POS main screen with authenticated role."""
         user_name = getattr(self, "logged_in_user_name", "Chef Marco Santos")
         user_role = getattr(self, "logged_in_role", "Administrator")
-        self.destroy()
+        self.withdraw()
         try:
             from POS import BastaPOSApp
-            pos_instance = BastaPOSApp(initial_view="pos", current_user=user_name, current_role=user_role)
-            pos_instance.mainloop()
+            self.pos_window = BastaPOSApp(master=self, initial_view="pos", current_user=user_name, current_role=user_role, login_window=self)
         except Exception:
             try:
                 from ProjectMain.POS import BastaPOSApp
-                pos_instance = BastaPOSApp(initial_view="pos", current_user=user_name, current_role=user_role)
-                pos_instance.mainloop()
+                self.pos_window = BastaPOSApp(master=self, initial_view="pos", current_user=user_name, current_role=user_role, login_window=self)
             except Exception as error:
                 print(f"[BASTA POS] POS launch error: {error}")
+                self.deiconify()
 
     def show_help_dialog(self):
         """Displays support contact information and database setup hint."""

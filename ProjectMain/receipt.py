@@ -45,6 +45,14 @@ class BastaReceiptWindow(customtkinter.CTkToplevel):
     Displays payment confirmation on the left and a digital tablet receipt on the right.
     """
 
+    def _windows_set_titlebar_color(self, color_mode=None):
+        """No-op to eliminate asynchronous window withdrawal and focus race conditions on Windows."""
+        pass
+
+    def _revert_withdraw_after_windows_set_titlebar_color(self):
+        """No-op to eliminate asynchronous window restoration race conditions."""
+        pass
+
     def __init__(self, parent_window=None, order_data=None):
         super().__init__(parent_window)
 
@@ -214,7 +222,7 @@ class BastaReceiptWindow(customtkinter.CTkToplevel):
         actions_row_1.grid_columnconfigure(0, weight=1)
         actions_row_1.grid_columnconfigure(1, weight=1)
 
-        new_order_btn = customtkinter.CTkButton(
+        self.new_order_btn = customtkinter.CTkButton(
             actions_row_1,
             text="+ New order",
             height=46,
@@ -225,9 +233,9 @@ class BastaReceiptWindow(customtkinter.CTkToplevel):
             hover_color="#059669",
             command=self.handle_new_order
         )
-        new_order_btn.grid(row=0, column=0, padx=(0, 6), sticky="ew")
+        self.new_order_btn.grid(row=0, column=0, padx=(0, 6), sticky="ew")
 
-        print_receipt_btn = customtkinter.CTkButton(
+        self.print_receipt_btn = customtkinter.CTkButton(
             actions_row_1,
             text="⎙ Print receipt",
             height=46,
@@ -238,55 +246,27 @@ class BastaReceiptWindow(customtkinter.CTkToplevel):
             hover_color="#27272a",
             command=self.handle_print_receipt
         )
-        print_receipt_btn.grid(row=0, column=1, padx=(6, 0), sticky="ew")
+        self.print_receipt_btn.grid(row=0, column=1, padx=(6, 0), sticky="ew")
 
-        # Action Buttons row 2 (Sub-actions)
+        # Action Buttons row 2 (Sub-action: Reopen order)
         actions_row_2 = customtkinter.CTkFrame(center_scroll, fg_color="transparent")
         actions_row_2.grid(row=8, column=0, sticky="ew", pady=(0, 10))
         actions_row_2.grid_columnconfigure(0, weight=1)
-        actions_row_2.grid_columnconfigure(1, weight=1)
-        actions_row_2.grid_columnconfigure(2, weight=1)
 
-        email_btn = customtkinter.CTkButton(
+        self.reopen_btn = customtkinter.CTkButton(
             actions_row_2,
-            text="✉ Email receipt",
+            text="↩ Reopen order",
             height=38,
             corner_radius=10,
-            font=customtkinter.CTkFont(size=12),
+            font=customtkinter.CTkFont(size=13),
             fg_color="#ffffff",
-            text_color="#334155",
+            text_color="#475569",
             border_width=1,
             border_color="#cbd5e1",
-            hover_color="#f1f5f9"
+            hover_color="#f1f5f9",
+            command=self.handle_reopen_order
         )
-        email_btn.grid(row=0, column=0, padx=4, sticky="ew")
-
-        sms_btn = customtkinter.CTkButton(
-            actions_row_2,
-            text="💬 Send via SMS",
-            height=38,
-            corner_radius=10,
-            font=customtkinter.CTkFont(size=12),
-            fg_color="#ffffff",
-            text_color="#334155",
-            border_width=1,
-            border_color="#cbd5e1",
-            hover_color="#f1f5f9"
-        )
-        sms_btn.grid(row=0, column=1, padx=4, sticky="ew")
-
-        reopen_btn = customtkinter.CTkButton(
-            actions_row_2,
-            text="Reopen order",
-            height=38,
-            corner_radius=10,
-            font=customtkinter.CTkFont(size=12),
-            fg_color="transparent",
-            text_color="#64748b",
-            hover_color="#e2e8f0",
-            command=self.destroy
-        )
-        reopen_btn.grid(row=0, column=2, padx=4, sticky="ew")
+        self.reopen_btn.grid(row=0, column=0, sticky="ew")
 
     def _build_tablet_receipt(self):
         """Constructs the digital tablet containing the white receipt."""
@@ -516,19 +496,47 @@ class BastaReceiptWindow(customtkinter.CTkToplevel):
         thanks_label.grid(row=current_row, column=0, columnspan=2, pady=(10, 18))
 
     def handle_new_order(self):
-        """Reset cart in POS and close the receipt window."""
-        if self.parent_window and hasattr(self.parent_window, "reset_cart"):
-            self.parent_window.reset_cart()
+        """Reset cart in POS, switch to POS view, and close receipt window."""
+        try:
+            self.grab_release()
+        except Exception:
+            pass
+        if self.parent_window:
+            if hasattr(self.parent_window, "reset_cart"):
+                self.parent_window.reset_cart()
+            if hasattr(self.parent_window, "switch_view"):
+                self.parent_window.switch_view("pos")
+            try:
+                self.parent_window.lift()
+                self.parent_window.focus_force()
+            except Exception:
+                pass
+        self.destroy()
+
+    def handle_reopen_order(self):
+        """Return to POS view with current order items still in cart for modifications."""
+        try:
+            self.grab_release()
+        except Exception:
+            pass
+        if self.parent_window:
+            if hasattr(self.parent_window, "switch_view"):
+                self.parent_window.switch_view("pos")
+            try:
+                self.parent_window.lift()
+                self.parent_window.focus_force()
+            except Exception:
+                pass
         self.destroy()
 
     def destroy(self):
-        """Safely cancels all pending Tcl after callbacks before destruction."""
+        """Safely release grab and destroy the receipt window."""
         try:
-            for after_id in self.tk.call("after", "info"):
-                try:
-                    self.after_cancel(after_id)
-                except Exception:
-                    pass
+            self.grab_release()
+        except Exception:
+            pass
+        try:
+            self.withdraw()
         except Exception:
             pass
         try:
@@ -537,9 +545,99 @@ class BastaReceiptWindow(customtkinter.CTkToplevel):
             pass
 
     def handle_print_receipt(self):
-        """Simulate receipt printing feedback."""
-        print("[BASTA POS] Printing receipt...")
-        # Can trigger system print or notification dialog if needed
+        """Generates formatted receipt text file, sends to printer/Notepad, and notifies user."""
+        order_id = self.order_data.get("order_id", "#B-1048")
+        table_num = self.order_data.get("table_num", "Table 12")
+        receipt_num = self.order_data.get("receipt_num", "OR-2026-01048")
+        cashier_name = self.order_data.get("cashier_name", "Bea M.")
+        txn_id = self.order_data.get("transaction_id", "TXN-0928-001048")
+        date_str = self.order_data.get("date_str", datetime.now().strftime("%d %b %Y - %I:%M %p"))
+        items = self.order_data.get("items", [])
+        subtotal = float(self.order_data.get("subtotal", 0.0))
+        vat = float(self.order_data.get("vat", 0.0))
+        service_charge = float(self.order_data.get("service_charge", 0.0))
+        total = float(self.order_data.get("total", 0.0))
+        pay_method = self.order_data.get("payment_method", "Cash")
+        cash_received = float(self.order_data.get("cash_received", total))
+        change_due = float(self.order_data.get("change_due", 0.0))
+
+        # Format clean, aligned receipt text
+        lines = [
+            "=" * 42,
+            "               BASTA BURGER               ",
+            "                BASTA POS                 ",
+            "    #11 Purok 2, Ibayo Marilao Bulacan    ",
+            "       VAT Reg. TIN 009-482-176-000       ",
+            "=" * 42,
+            f"Receipt No : {receipt_num}",
+            f"Order No   : {order_id} ({table_num})",
+            f"Date & Time: {date_str}",
+            f"Cashier    : {cashier_name}",
+            f"Transaction: {txn_id}",
+            "-" * 42,
+            f"{'ITEM':<20}{'QTY':>4}{'PRICE':>8}{'TOTAL':>10}",
+            "-" * 42,
+        ]
+
+        for item in items:
+            name = item.get("name", "Item")
+            qty = item.get("qty", 1)
+            price = float(item.get("price", 0.0))
+            item_tot = qty * price
+            lines.append(f"{name[:19]:<20}{qty:>4} {price:>7,.2f} {item_tot:>9,.2f}")
+
+        lines.extend([
+            "-" * 42,
+            f"{'Subtotal':<24} PHP {subtotal:>12,.2f}",
+            f"{'VAT (12%)':<24} PHP {vat:>12,.2f}",
+            f"{'Service Charge (10%)':<24} PHP {service_charge:>12,.2f}",
+            "=" * 42,
+            f"{'TOTAL AMOUNT':<24} PHP {total:>12,.2f}",
+            "=" * 42,
+            f"{'Payment Method':<24} {pay_method:>16}",
+            f"{'Cash Received':<24} PHP {cash_received:>12,.2f}",
+            f"{'Change Due':<24} PHP {change_due:>12,.2f}",
+            "=" * 42,
+            "         Salamat! See you again.          ",
+            "=" * 42
+        ])
+        receipt_text = "\n".join(lines)
+
+        # Save to Receipts folder
+        receipts_dir = os.path.join(project_root, "Receipts")
+        receipt_file_path = None
+        safe_num = "".join(c for c in receipt_num if c.isalnum() or c in "-_")
+        try:
+            os.makedirs(receipts_dir, exist_ok=True)
+            receipt_file_path = os.path.join(receipts_dir, f"Receipt_{safe_num}.txt")
+            with open(receipt_file_path, "w", encoding="utf-8") as f:
+                f.write(receipt_text)
+        except Exception as file_err:
+            print(f"[BASTA POS] Could not save receipt file: {file_err}")
+
+        # Update button state for tactile visual feedback
+        if hasattr(self, "print_receipt_btn"):
+            self.print_receipt_btn.configure(text="✓ Printed!", fg_color="#059669")
+            self.after(2000, lambda: self.print_receipt_btn.configure(text="⎙ Print receipt", fg_color="#18181b"))
+
+        # Send to Windows print subsystem or open file
+        if receipt_file_path and os.path.exists(receipt_file_path):
+            try:
+                os.startfile(receipt_file_path, "print")
+            except Exception:
+                try:
+                    os.startfile(receipt_file_path)
+                except Exception as open_err:
+                    print(f"[BASTA POS] Could not open receipt: {open_err}")
+
+        try:
+            from tkinter import messagebox
+            messagebox.showinfo(
+                "Print Receipt",
+                f"Receipt {receipt_num} printed successfully!\n\nSaved to: Receipts/Receipt_{safe_num}.txt"
+            )
+        except Exception:
+            pass
 
 
 if __name__ == "__main__":

@@ -7,6 +7,8 @@ All variables and functions strictly use snake_case.
 
 import os
 import sys
+import csv
+from datetime import datetime
 from PIL import Image
 import customtkinter
 
@@ -103,7 +105,19 @@ class InventoryOverviewView(customtkinter.CTkFrame):
         )
         receive_stock_btn.pack(side="left", padx=6)
 
-        export_btn = customtkinter.CTkButton(
+        self.print_btn = customtkinter.CTkButton(
+            top_actions,
+            text="⎙ Print Report",
+            font=customtkinter.CTkFont(size=12, weight="bold"),
+            fg_color="#10b981",
+            hover_color="#059669",
+            height=38,
+            corner_radius=10,
+            command=self.handle_print_report
+        )
+        self.print_btn.pack(side="left", padx=6)
+
+        self.export_btn = customtkinter.CTkButton(
             top_actions,
             text="⤓ Export CSV",
             font=customtkinter.CTkFont(size=12),
@@ -113,9 +127,10 @@ class InventoryOverviewView(customtkinter.CTkFrame):
             border_width=1,
             border_color="#cbd5e1",
             height=38,
-            corner_radius=10
+            corner_radius=10,
+            command=self.handle_export_csv
         )
-        export_btn.pack(side="left", padx=6)
+        self.export_btn.pack(side="left", padx=6)
 
         # 2. Key Metrics Row (4 Cards)
         metrics_frame = customtkinter.CTkFrame(main_scroll, fg_color="transparent")
@@ -408,6 +423,159 @@ class InventoryOverviewView(customtkinter.CTkFrame):
             self.render_inventory_table()
 
         customtkinter.CTkButton(dialog, text="Save Adjustment", fg_color="#10b981", hover_color="#059669", height=38, width=320, command=save_adjustment).pack(pady=14)
+
+    def handle_print_report(self):
+        """Generates formatted inventory stock report text, sends to printer/Notepad, and notifies user."""
+        now_str = datetime.now().strftime("%d %b %Y - %I:%M %p")
+        lines = [
+            "=" * 65,
+            "                   BASTA BURGER - POS                   ",
+            "             INVENTORY & STOCK STATUS REPORT            ",
+            "=" * 65,
+            f"Generated On: {now_str}",
+            "-" * 65,
+            "1. INVENTORY VALUATION & REORDER HEALTH",
+            "-" * 65,
+            f"  TOTAL INVENTORY VALUE : ₱148,250 (+2.4% vs last week)",
+            f"  LOW STOCK ALERTS      : 3 critical items requiring attention",
+            f"  MONTHLY TURNOVER      : 4.2x (Optimal velocity)",
+            f"  WASTE & SPOILAGE      : 1.2% (-0.4% this month)",
+            "-" * 65,
+            "2. CURRENT INGREDIENT STOCK LEVELS",
+            "-" * 65,
+            f"{'SKU':<12}{'INGREDIENT NAME':<26}{'ON HAND':<12}{'PAR':<10}{'STATUS':<10}",
+            "-" * 65,
+        ]
+
+        for item in self.inventory_items:
+            sku = item.get("sku", "")
+            name = item.get("name", "")
+            on_hand = item.get("on_hand", "")
+            par = item.get("par", "")
+            status = item.get("status", "Healthy")
+            lines.append(f"{sku:<12}{name[:24]:<26}{on_hand:<12}{par:<10}{status:<10}")
+
+        lines.extend([
+            "-" * 65,
+            "3. CRITICAL STOCK REORDER ALERTS",
+            "-" * 65,
+            "  * Brioche burger buns (ING-0031) - 4 packs on hand (Par: 12 packs) [CRITICAL]",
+            "  * Frozen ube ice cream (ING-0064) - 2.4 L on hand (Par: 6 L) [LOW STOCK]",
+            "  * Calamansi glaze (ING-0102) - 3 bottles on hand (Par: 8 bottles) [LOW STOCK]",
+            "=" * 65,
+            "                END OF INVENTORY REPORT                  ",
+            "=" * 65
+        ])
+        report_text = "\n".join(lines)
+
+        reports_dir = os.path.join(project_root, "Reports")
+        os.makedirs(reports_dir, exist_ok=True)
+        safe_time = datetime.now().strftime("%Y%m%d_%H%M%S")
+        file_path = os.path.join(reports_dir, f"Stock_Report_{safe_time}.txt")
+        try:
+            with open(file_path, "w", encoding="utf-8") as f:
+                f.write(report_text)
+        except Exception as err:
+            print(f"[BASTA POS] Failed to save stock report: {err}")
+
+        if hasattr(self, "print_btn"):
+            self.print_btn.configure(text="✓ Printed!", fg_color="#059669")
+            self.after(2000, lambda: self.print_btn.configure(text="⎙ Print Report", fg_color="#10b981"))
+
+        if os.path.exists(file_path):
+            try:
+                os.startfile(file_path, "print")
+            except Exception:
+                try:
+                    os.startfile(file_path)
+                except Exception as open_err:
+                    print(f"[BASTA POS] Could not open file: {open_err}")
+
+        try:
+            from tkinter import messagebox
+            messagebox.showinfo(
+                "Print Stock Report",
+                f"Inventory Stock Report sent to printer!\n\nSaved to:\nReports/{os.path.basename(file_path)}"
+            )
+        except Exception:
+            pass
+
+    def handle_export_csv(self):
+        """Exports the full inventory stock data to a CSV spreadsheet."""
+        from tkinter import filedialog, messagebox
+
+        default_filename = f"Inventory_Stock_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+        initial_dir = os.path.join(project_root, "Exports")
+        os.makedirs(initial_dir, exist_ok=True)
+
+        file_path = filedialog.asksaveasfilename(
+            initialdir=initial_dir,
+            initialfile=default_filename,
+            defaultextension=".csv",
+            filetypes=[("CSV files", "*.csv"), ("All files", "*.*")]
+        )
+        if not file_path:
+            return
+
+        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        try:
+            with open(file_path, mode="w", newline="", encoding="utf-8-sig") as csv_file:
+                writer = csv.writer(csv_file)
+
+                # Header
+                writer.writerow(["BASTA BURGER - INVENTORY & STOCK OVERVIEW REPORT"])
+                writer.writerow(["Export Timestamp", now_str])
+                writer.writerow([])
+
+                # KPI Metrics Summary
+                writer.writerow(["--- INVENTORY KPI SUMMARY ---"])
+                writer.writerow(["Metric", "Value", "Status / Trend"])
+                writer.writerow(["Total Inventory Value", "₱148,250", "+2.4% vs last week"])
+                writer.writerow(["Low Stock Alerts", "3 items", "Requires reorder"])
+                writer.writerow(["Monthly Turnover", "4.2x", "Optimal velocity"])
+                writer.writerow(["Waste & Spoilage", "1.2%", "-0.4% this month"])
+                writer.writerow([])
+
+                # Category Breakdown
+                writer.writerow(["--- INVENTORY VALUE BY CATEGORY ---"])
+                writer.writerow(["Category", "Share %", "Value"])
+                writer.writerow(["Proteins (Beef, Chicken, Bacon)", "45%", "₱66,712"])
+                writer.writerow(["Bakery (Brioche Buns, Rolls)", "22%", "₱32,615"])
+                writer.writerow(["Produce & Dairy (Potatoes, Cheese)", "18%", "₱26,685"])
+                writer.writerow(["Sauces & Condiments", "15%", "₱22,238"])
+                writer.writerow([])
+
+                # Detailed Items Table
+                writer.writerow(["--- INVENTORY INGREDIENTS TABLE ---"])
+                writer.writerow(["SKU", "Ingredient Name", "Category", "On Hand Quantity", "Par Level (Safety Threshold)", "Unit Cost", "Stock Health Status"])
+                for it in self.inventory_items:
+                    writer.writerow([
+                        it.get("sku", ""),
+                        it.get("name", ""),
+                        it.get("category", ""),
+                        it.get("on_hand", ""),
+                        it.get("par", ""),
+                        it.get("unit_cost", ""),
+                        it.get("status", "")
+                    ])
+
+            if hasattr(self, "export_btn"):
+                self.export_btn.configure(text="✓ Exported!", fg_color="#10b981", text_color="#ffffff")
+                self.after(2000, lambda: self.export_btn.configure(text="⤓ Export CSV", fg_color="#ffffff", text_color="#0f172a"))
+
+            res = messagebox.askyesno(
+                "Export Successful",
+                f"Inventory stock data successfully exported to:\n{file_path}\n\nWould you like to open the CSV file now?"
+            )
+            if res:
+                try:
+                    os.startfile(file_path)
+                except Exception as open_err:
+                    print(f"[BASTA POS] Could not open CSV file: {open_err}")
+
+        except Exception as err:
+            messagebox.showerror("Export Error", f"Failed to export CSV:\n{err}")
 
 
 class InventoryOverviewApp:

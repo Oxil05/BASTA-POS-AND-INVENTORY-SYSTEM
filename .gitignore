@@ -20,3 +20,10 @@ Thumbs.db
 ehthumbs.db
 Desktop.ini
 .DS_Store
+
+# Generated receipts, reports, and exports
+Receipts/*.txt
+Reports/*.txt
+Exports/*.csv
+
+
