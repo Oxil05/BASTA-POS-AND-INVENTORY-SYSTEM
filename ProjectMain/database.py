@@ -466,8 +466,31 @@ def update_product(product_id, name, sku, category, price, cost_price, stock_qua
         return False
 
 
+def archive_product(product_id, archive=True):
+    """Sets product status to Archived or Active in MySQL database (soft delete)."""
+    conn = get_db_connection()
+    if not conn:
+        return False
+    try:
+        cursor = conn.cursor()
+        new_status = 'Archived' if archive else 'Active'
+        in_store_val = False if archive else True
+        cursor.execute("""
+            UPDATE `products`
+            SET `status` = %s, `in_store` = %s
+            WHERE `id` = %s;
+        """, (new_status, in_store_val, product_id))
+        conn.commit()
+        cursor.close()
+        conn.close()
+        return True
+    except Exception as err:
+        print(f"[BASTA DB] Archive product error: {err}")
+        return False
+
+
 def delete_product(product_id):
-    """Deletes a product from MySQL database by ID."""
+    """Deletes a product from MySQL database by ID (Hard delete - not recommended in production)."""
     conn = get_db_connection()
     if not conn:
         return False

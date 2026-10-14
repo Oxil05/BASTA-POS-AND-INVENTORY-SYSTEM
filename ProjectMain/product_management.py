@@ -213,23 +213,13 @@ class ProductManagementView(customtkinter.CTkFrame):
         )
         self.add_btn.pack(side="left", padx=4)
 
-        # 2. Key Metrics Row
-        metrics_frame = customtkinter.CTkFrame(self.main_scroll, fg_color="transparent")
-        metrics_frame.grid(row=1, column=0, sticky="ew", padx=16, pady=(0, 16))
+        # 2. Key Metrics Row (Dynamically calculated from live product catalog)
+        self.metrics_frame = customtkinter.CTkFrame(self.main_scroll, fg_color="transparent")
+        self.metrics_frame.grid(row=1, column=0, sticky="ew", padx=16, pady=(0, 16))
         for col_idx in range(3):
-            metrics_frame.grid_columnconfigure(col_idx, weight=1)
+            self.metrics_frame.grid_columnconfigure(col_idx, weight=1)
 
-        metrics = [
-            ("TOTAL ACTIVE PRODUCTS", "32 items", "+3 added this month", "#10b981"),
-            ("LOW STOCK ALERT", "4 items", "Order re-stock required", "#ef4444"),
-            ("OUT OF STOCK", "1 item", "Temporarily paused", "#94a3b8")
-        ]
-        for idx, (m_title, m_val, m_sub, m_sub_color) in enumerate(metrics):
-            m_card = customtkinter.CTkFrame(metrics_frame, fg_color="#ffffff", corner_radius=14, border_width=1, border_color="#e2e8f0")
-            m_card.grid(row=0, column=idx, padx=6, pady=4, sticky="nsew")
-            customtkinter.CTkLabel(m_card, text=m_title, font=customtkinter.CTkFont(size=10, weight="bold"), text_color="#64748b").pack(anchor="w", padx=16, pady=(12, 2))
-            customtkinter.CTkLabel(m_card, text=m_val, font=customtkinter.CTkFont(size=22, weight="bold"), text_color="#09090b").pack(anchor="w", padx=16, pady=2)
-            customtkinter.CTkLabel(m_card, text=m_sub, font=customtkinter.CTkFont(size=11, weight="bold"), text_color=m_sub_color).pack(anchor="w", padx=16, pady=(0, 12))
+        self.render_metrics_cards()
 
         # 3. Product Catalog Table
         catalog_card = customtkinter.CTkFrame(self.main_scroll, fg_color="#ffffff", corner_radius=14, border_width=1, border_color="#e2e8f0")
@@ -394,18 +384,18 @@ class ProductManagementView(customtkinter.CTkFrame):
         self.online_switch.grid(row=1, column=0, sticky="ew", pady=3)
         self.online_switch.select()
 
-        # Action Buttons: Delete & Save
+        # Action Buttons: Archive & Save
         actions_drawer = customtkinter.CTkFrame(self.editor_panel, fg_color="transparent")
         actions_drawer.grid(row=9, column=0, padx=16, pady=(10, 16), sticky="ew")
         actions_drawer.grid_columnconfigure(0, weight=1)
         actions_drawer.grid_columnconfigure(1, weight=2)
 
-        self.delete_btn = customtkinter.CTkButton(
-            actions_drawer, text="🗑 Delete", height=42, corner_radius=10, font=customtkinter.CTkFont(size=12, weight="bold"),
-            fg_color="#ffffff", text_color="#ef4444", border_width=1, border_color="#fca5a5", hover_color="#fee2e2",
-            command=self.delete_current_product
+        self.archive_btn = customtkinter.CTkButton(
+            actions_drawer, text="📦 Archive", height=42, corner_radius=10, font=customtkinter.CTkFont(size=12, weight="bold"),
+            fg_color="#ffffff", text_color="#d97706", border_width=1, border_color="#fcd34d", hover_color="#fef3c7",
+            command=self.archive_current_product
         )
-        self.delete_btn.grid(row=0, column=0, padx=(0, 6), sticky="ew")
+        self.archive_btn.grid(row=0, column=0, padx=(0, 6), sticky="ew")
 
         self.save_btn = customtkinter.CTkButton(
             actions_drawer, text="✓ Save changes", height=42, corner_radius=10, font=customtkinter.CTkFont(size=13, weight="bold"),
@@ -415,6 +405,59 @@ class ProductManagementView(customtkinter.CTkFrame):
         self.save_btn.grid(row=0, column=1, padx=(6, 0), sticky="ew")
 
         self.populate_drawer(self.selected_product)
+
+    def render_metrics_cards(self):
+        """Dynamically computes and renders the 3 key metric cards from live products data."""
+        if not hasattr(self, "metrics_frame"):
+            return
+
+        for w in self.metrics_frame.winfo_children():
+            w.destroy()
+
+        active_prods = [p for p in self.products_data if p.get("status", "Active") == "Active"]
+        total_active = len(active_prods)
+
+        low_stock_items = [
+            p for p in self.products_data
+            if 0 < int(p.get("stock", 0)) <= int(p.get("low_stock", 10))
+        ]
+        low_stock_count = len(low_stock_items)
+
+        out_of_stock_items = [
+            p for p in self.products_data
+            if int(p.get("stock", 0)) <= 0
+        ]
+        out_of_stock_count = len(out_of_stock_items)
+
+        card_1_sub = f"{len(self.products_data)} total cataloged"
+        card_1_color = "#10b981"
+
+        if low_stock_count > 0:
+            card_2_sub = f"{low_stock_count} item{'s' if low_stock_count > 1 else ''} ≤ threshold"
+            card_2_color = "#ef4444"
+        else:
+            card_2_sub = "All stock levels healthy"
+            card_2_color = "#10b981"
+
+        if out_of_stock_count > 0:
+            card_3_sub = "Order replenishment required"
+            card_3_color = "#ef4444"
+        else:
+            card_3_sub = "No depleted items"
+            card_3_color = "#64748b"
+
+        metrics = [
+            ("TOTAL ACTIVE PRODUCTS", f"{total_active} item{'s' if total_active != 1 else ''}", card_1_sub, card_1_color),
+            ("LOW STOCK ALERT", f"{low_stock_count} item{'s' if low_stock_count != 1 else ''}", card_2_sub, card_2_color),
+            ("OUT OF STOCK", f"{out_of_stock_count} item{'s' if out_of_stock_count != 1 else ''}", card_3_sub, card_3_color)
+        ]
+
+        for idx, (m_title, m_val, m_sub, m_sub_color) in enumerate(metrics):
+            m_card = customtkinter.CTkFrame(self.metrics_frame, fg_color="#ffffff", corner_radius=14, border_width=1, border_color="#e2e8f0")
+            m_card.grid(row=0, column=idx, padx=6, pady=4, sticky="nsew")
+            customtkinter.CTkLabel(m_card, text=m_title, font=customtkinter.CTkFont(size=10, weight="bold"), text_color="#64748b").pack(anchor="w", padx=16, pady=(12, 2))
+            customtkinter.CTkLabel(m_card, text=m_val, font=customtkinter.CTkFont(size=22, weight="bold"), text_color="#09090b").pack(anchor="w", padx=16, pady=2)
+            customtkinter.CTkLabel(m_card, text=m_sub, font=customtkinter.CTkFont(size=11, weight="bold"), text_color=m_sub_color).pack(anchor="w", padx=16, pady=(0, 12))
 
     def render_product_list(self, query=""):
         for w in self.table_container.winfo_children():
@@ -439,27 +482,48 @@ class ProductManagementView(customtkinter.CTkFrame):
                 r_frame.grid_columnconfigure(c, weight=1)
 
             # Name & SKU
+            is_archived = (prod.get("status") == "Archived")
             name_box = customtkinter.CTkFrame(r_frame, fg_color="transparent")
             name_box.grid(row=0, column=0, sticky="w", padx=6, pady=8)
-            customtkinter.CTkLabel(name_box, text=prod["name"], font=customtkinter.CTkFont(size=12, weight="bold"), text_color="#0f172a").pack(anchor="w")
-            customtkinter.CTkLabel(name_box, text=f"SKU: {prod['sku']}", font=customtkinter.CTkFont(size=10), text_color="#94a3b8").pack(anchor="w")
+            customtkinter.CTkLabel(name_box, text=prod["name"], font=customtkinter.CTkFont(size=12, weight="bold"), text_color="#0f172a" if not is_archived else "#64748b").pack(anchor="w")
+            sku_label_txt = f"SKU: {prod['sku']} · (Archived)" if is_archived else f"SKU: {prod['sku']}"
+            customtkinter.CTkLabel(name_box, text=sku_label_txt, font=customtkinter.CTkFont(size=10), text_color="#94a3b8").pack(anchor="w")
 
             # Category pill
             cat_pill = customtkinter.CTkFrame(r_frame, fg_color="#e2e8f0", corner_radius=6)
             cat_pill.grid(row=0, column=1, sticky="w", padx=6, pady=8)
             customtkinter.CTkLabel(cat_pill, text=prod["category"], font=customtkinter.CTkFont(size=10), text_color="#334155").pack(padx=6, pady=2)
 
-            # Stock count
-            customtkinter.CTkLabel(r_frame, text=f"{prod['stock']} units", font=customtkinter.CTkFont(size=11, weight="bold"), text_color="#0f172a").grid(row=0, column=2, sticky="w", padx=6, pady=8)
+            # Stock count with threshold indication
+            stk_num = int(prod.get("stock", 0))
+            low_thresh = int(prod.get("low_stock", 10))
+            if stk_num <= 0:
+                stk_txt = "0 units (Depleted)"
+                stk_color = "#ef4444"
+            elif stk_num <= low_thresh:
+                stk_txt = f"{stk_num} units (Low Stock)"
+                stk_color = "#ea580c"
+            else:
+                stk_txt = f"{stk_num} units"
+                stk_color = "#0f172a"
+
+            customtkinter.CTkLabel(r_frame, text=stk_txt, font=customtkinter.CTkFont(size=11, weight="bold"), text_color=stk_color).grid(row=0, column=2, sticky="w", padx=6, pady=8)
 
             # Price
             customtkinter.CTkLabel(r_frame, text=f"₱{prod['price']:,.2f}", font=customtkinter.CTkFont(size=11, weight="bold"), text_color="#0f172a").grid(row=0, column=3, sticky="w", padx=6, pady=8)
 
-            # Availability channels
-            avail_txt = "POS" if prod.get("in_store", True) else ""
-            if prod.get("online"):
-                avail_txt += " · Online" if avail_txt else "Online"
-            customtkinter.CTkLabel(r_frame, text=avail_txt or "Inactive", font=customtkinter.CTkFont(size=10), text_color="#64748b").grid(row=0, column=4, sticky="w", padx=6, pady=8)
+            # Availability channels / Status
+            if is_archived:
+                avail_txt = "📦 Archived"
+                avail_color = "#d97706"
+            else:
+                avail_txt = "POS" if prod.get("in_store", True) else ""
+                if prod.get("online"):
+                    avail_txt += " · Online" if avail_txt else "Online"
+                avail_color = "#64748b" if avail_txt else "#94a3b8"
+                avail_txt = avail_txt or "Inactive"
+
+            customtkinter.CTkLabel(r_frame, text=avail_txt, font=customtkinter.CTkFont(size=10, weight="bold" if is_archived else "normal"), text_color=avail_color).grid(row=0, column=4, sticky="w", padx=6, pady=8)
 
             # Edit Button
             edit_btn = customtkinter.CTkButton(
@@ -565,6 +629,8 @@ class ProductManagementView(customtkinter.CTkFrame):
         self.in_store_switch.select()
         self.online_switch.select()
         self.load_product_image_preview("basta_LOGO.png")
+        if hasattr(self, "archive_btn"):
+            self.archive_btn.configure(state="disabled", text="📦 Archive", text_color="#94a3b8", border_color="#e2e8f0")
         self.render_product_list(query=self.search_entry.get().strip())
 
     def populate_drawer(self, prod):
@@ -594,6 +660,23 @@ class ProductManagementView(customtkinter.CTkFrame):
             self.online_switch.select()
         else:
             self.online_switch.deselect()
+
+        if hasattr(self, "archive_btn"):
+            self.archive_btn.configure(state="normal")
+            if prod.get("status") == "Archived":
+                self.archive_btn.configure(
+                    text="📦 Restore",
+                    text_color="#059669",
+                    border_color="#86efac",
+                    hover_color="#ecfdf5"
+                )
+            else:
+                self.archive_btn.configure(
+                    text="📦 Archive",
+                    text_color="#d97706",
+                    border_color="#fcd34d",
+                    hover_color="#fef3c7"
+                )
 
         self.load_product_image_preview(prod.get("image_filename", "basta_LOGO.png"))
 
@@ -677,6 +760,7 @@ class ProductManagementView(customtkinter.CTkFrame):
 
         self.populate_drawer(self.selected_product)
         self.render_product_list(query=self.search_entry.get().strip())
+        self.render_metrics_cards()
 
         # Notify main controller (POS) to synchronize immediately
         if self.app_controller:
@@ -685,27 +769,48 @@ class ProductManagementView(customtkinter.CTkFrame):
             if hasattr(self.app_controller, "render_product_cards"):
                 self.app_controller.render_product_cards()
 
-    def delete_current_product(self):
+    def archive_current_product(self):
+        """Archives or restores the currently selected product (Soft Delete)."""
         if not self.is_admin():
-            messagebox.showwarning("Permission Denied", "Access Denied: Only Administrators are authorized to delete products.")
+            messagebox.showwarning("Permission Denied", "Access Denied: Only Administrators are authorized to archive products.")
             return
-        if self.selected_product and self.selected_product in self.products_data:
-            try:
-                from database import delete_product
-                delete_product(self.selected_product["id"])
-            except Exception as e:
-                print(f"[BASTA DB] Product delete notice: {e}")
 
-            self.products_data.remove(self.selected_product)
-            self.selected_product = self.products_data[0] if self.products_data else None
-            self.populate_drawer(self.selected_product)
-            self.render_product_list(query=self.search_entry.get().strip())
+        if not self.selected_product or self.is_creating_new:
+            return
 
-            if self.app_controller:
-                if hasattr(self.app_controller, "sync_products_from_management"):
-                    self.app_controller.sync_products_from_management()
-                if hasattr(self.app_controller, "render_product_cards"):
-                    self.app_controller.render_product_cards()
+        is_currently_archived = (self.selected_product.get("status") == "Archived")
+        action_name = "Restore" if is_currently_archived else "Archive"
+        new_status = "Active" if is_currently_archived else "Archived"
+        new_in_store = True if is_currently_archived else False
+
+        confirm_msg = (
+            f"Restore '{self.selected_product['name']}' to the active menu?\n\n"
+            "This product will appear on the POS register again for cashiers."
+            if is_currently_archived else
+            f"Archive '{self.selected_product['name']}'?\n\n"
+            "This will hide the item from the POS register, but preserves all past sales history, receipts, and reports."
+        )
+        if not messagebox.askyesno(f"Confirm {action_name}", confirm_msg):
+            return
+
+        try:
+            from database import archive_product
+            archive_product(self.selected_product["id"], archive=(new_status == "Archived"))
+        except Exception as e:
+            print(f"[BASTA DB] Product archive notice: {e}")
+
+        self.selected_product["status"] = new_status
+        self.selected_product["in_store"] = new_in_store
+
+        self.populate_drawer(self.selected_product)
+        self.render_product_list(query=self.search_entry.get().strip())
+        self.render_metrics_cards()
+
+        if self.app_controller:
+            if hasattr(self.app_controller, "sync_products_from_management"):
+                self.app_controller.sync_products_from_management()
+            if hasattr(self.app_controller, "render_product_cards"):
+                self.app_controller.render_product_cards()
 
     def on_search(self, event=None):
         self.render_product_list(query=self.search_entry.get().strip())

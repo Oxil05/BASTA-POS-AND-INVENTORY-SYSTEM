@@ -132,67 +132,18 @@ class InventoryOverviewView(customtkinter.CTkFrame):
         )
         self.export_btn.pack(side="left", padx=6)
 
-        # 2. Key Metrics Row (4 Cards)
-        metrics_frame = customtkinter.CTkFrame(main_scroll, fg_color="transparent")
-        metrics_frame.grid(row=1, column=0, sticky="ew", padx=16, pady=(0, 16))
+        # 2. Key Metrics Row (4 Cards - Dynamically calculated)
+        self.metrics_frame = customtkinter.CTkFrame(main_scroll, fg_color="transparent")
+        self.metrics_frame.grid(row=1, column=0, sticky="ew", padx=16, pady=(0, 16))
         for col_idx in range(4):
-            metrics_frame.grid_columnconfigure(col_idx, weight=1)
-
-        metrics_data = [
-            {"title": "TOTAL INVENTORY VALUE", "val": "₱148,250", "sub": "+2.4% vs last week", "sub_color": "#10b981", "badge": "📦"},
-            {"title": "LOW STOCK ALERTS", "val": "5 items", "sub": "Requires attention", "sub_color": "#ef4444", "badge": "⚠"},
-            {"title": "MONTHLY TURNOVER", "val": "4.2x", "sub": "Optimal velocity", "sub_color": "#10b981", "badge": "🔄"},
-            {"title": "WASTE & SPOILAGE", "val": "1.2%", "sub": "-0.4% this month", "sub_color": "#10b981", "badge": "📉"}
-        ]
-
-        for idx, m in enumerate(metrics_data):
-            card = customtkinter.CTkFrame(metrics_frame, fg_color="#ffffff", corner_radius=14, border_width=1, border_color="#e2e8f0")
-            card.grid(row=0, column=idx, padx=6, pady=4, sticky="nsew")
-
-            card_top = customtkinter.CTkFrame(card, fg_color="transparent")
-            card_top.pack(fill="x", padx=16, pady=(14, 4))
-            customtkinter.CTkLabel(card_top, text=m["title"], font=customtkinter.CTkFont(size=10, weight="bold"), text_color="#64748b").pack(side="left")
-            customtkinter.CTkLabel(card_top, text=m["badge"], font=customtkinter.CTkFont(size=14)).pack(side="right")
-
-            customtkinter.CTkLabel(card, text=m["val"], font=customtkinter.CTkFont(size=22, weight="bold"), text_color="#09090b").pack(anchor="w", padx=16, pady=2)
-            customtkinter.CTkLabel(card, text=m["sub"], font=customtkinter.CTkFont(size=11, weight="bold"), text_color=m["sub_color"]).pack(anchor="w", padx=16, pady=(0, 14))
+            self.metrics_frame.grid_columnconfigure(col_idx, weight=1)
 
         # 3. Critical Low Stock Alert Banner
-        alert_box = customtkinter.CTkFrame(main_scroll, fg_color="#fef2f2", corner_radius=14, border_width=1, border_color="#fecaca")
-        alert_box.grid(row=2, column=0, sticky="ew", padx=16, pady=(0, 16))
-        alert_box.grid_columnconfigure(0, weight=1)
+        self.alert_box = customtkinter.CTkFrame(main_scroll, fg_color="#fef2f2", corner_radius=14, border_width=1, border_color="#fecaca")
+        self.alert_box.grid(row=2, column=0, sticky="ew", padx=16, pady=(0, 16))
+        self.alert_box.grid_columnconfigure(0, weight=1)
 
-        alert_inner = customtkinter.CTkFrame(alert_box, fg_color="transparent")
-        alert_inner.grid(row=0, column=0, padx=16, pady=12, sticky="ew")
-        alert_inner.grid_columnconfigure(1, weight=1)
-
-        customtkinter.CTkLabel(alert_inner, text="🚨", font=customtkinter.CTkFont(size=18)).grid(row=0, column=0, padx=(0, 10))
-        alert_text = customtkinter.CTkFrame(alert_inner, fg_color="transparent")
-        alert_text.grid(row=0, column=1, sticky="w")
-        customtkinter.CTkLabel(
-            alert_text,
-            text="3 critical ingredients reached reorder par level",
-            font=customtkinter.CTkFont(size=13, weight="bold"),
-            text_color="#991b1b"
-        ).pack(anchor="w")
-        customtkinter.CTkLabel(
-            alert_text,
-            text="Brioche buns, Ube ice cream, and Calamansi glaze are below minimum safety thresholds.",
-            font=customtkinter.CTkFont(size=11),
-            text_color="#b91c1c"
-        ).pack(anchor="w")
-
-        reorder_btn = customtkinter.CTkButton(
-            alert_inner,
-            text="Reorder Now",
-            font=customtkinter.CTkFont(size=11, weight="bold"),
-            fg_color="#ef4444",
-            hover_color="#dc2626",
-            height=32,
-            corner_radius=8,
-            command=self.show_receive_stock_dialog
-        )
-        reorder_btn.grid(row=0, column=2, padx=(10, 0))
+        self.render_metrics_and_alerts()
 
         # 4. Two Split Cards: Category Value Breakdown + Stock Movements
         split_row = customtkinter.CTkFrame(main_scroll, fg_color="transparent")
@@ -287,6 +238,96 @@ class InventoryOverviewView(customtkinter.CTkFrame):
             self.table_container.grid_columnconfigure(c, weight=1)
 
         self.render_inventory_table()
+
+    def render_metrics_and_alerts(self):
+        """Dynamically renders metric cards and alert banner from live inventory items state."""
+        if not hasattr(self, "metrics_frame") or not hasattr(self, "alert_box"):
+            return
+
+        for w in self.metrics_frame.winfo_children():
+            w.destroy()
+
+        low_alerts = [i for i in self.inventory_items if i.get("status") in ["Critical", "Low stock"]]
+        low_count = len(low_alerts)
+
+        metrics_data = [
+            {"title": "TOTAL INVENTORY VALUE", "val": "₱148,250", "sub": "+2.4% vs last week", "sub_color": "#10b981", "badge": "📦"},
+            {"title": "LOW STOCK ALERTS", "val": f"{low_count} items", "sub": "Requires attention" if low_count > 0 else "All par levels healthy", "sub_color": "#ef4444" if low_count > 0 else "#10b981", "badge": "⚠"},
+            {"title": "MONTHLY TURNOVER", "val": "4.2x", "sub": "Optimal velocity", "sub_color": "#10b981", "badge": "🔄"},
+            {"title": "WASTE & SPOILAGE", "val": "1.2%", "sub": "-0.4% this month", "sub_color": "#10b981", "badge": "📉"}
+        ]
+
+        for idx, m in enumerate(metrics_data):
+            card = customtkinter.CTkFrame(self.metrics_frame, fg_color="#ffffff", corner_radius=14, border_width=1, border_color="#e2e8f0")
+            card.grid(row=0, column=idx, padx=6, pady=4, sticky="nsew")
+
+            card_top = customtkinter.CTkFrame(card, fg_color="transparent")
+            card_top.pack(fill="x", padx=16, pady=(14, 4))
+            customtkinter.CTkLabel(card_top, text=m["title"], font=customtkinter.CTkFont(size=10, weight="bold"), text_color="#64748b").pack(side="left")
+            customtkinter.CTkLabel(card_top, text=m["badge"], font=customtkinter.CTkFont(size=14)).pack(side="right")
+
+            customtkinter.CTkLabel(card, text=m["val"], font=customtkinter.CTkFont(size=22, weight="bold"), text_color="#09090b").pack(anchor="w", padx=16, pady=2)
+            customtkinter.CTkLabel(card, text=m["sub"], font=customtkinter.CTkFont(size=11, weight="bold"), text_color=m["sub_color"]).pack(anchor="w", padx=16, pady=(0, 14))
+
+        # Alert Box
+        for w in self.alert_box.winfo_children():
+            w.destroy()
+
+        if low_count > 0:
+            self.alert_box.configure(fg_color="#fef2f2", border_color="#fecaca")
+            alert_inner = customtkinter.CTkFrame(self.alert_box, fg_color="transparent")
+            alert_inner.grid(row=0, column=0, padx=16, pady=12, sticky="ew")
+            alert_inner.grid_columnconfigure(1, weight=1)
+
+            customtkinter.CTkLabel(alert_inner, text="🚨", font=customtkinter.CTkFont(size=18)).grid(row=0, column=0, padx=(0, 10))
+            alert_text = customtkinter.CTkFrame(alert_inner, fg_color="transparent")
+            alert_text.grid(row=0, column=1, sticky="w")
+            customtkinter.CTkLabel(
+                alert_text,
+                text=f"{low_count} critical ingredient{'s' if low_count != 1 else ''} reached reorder par level",
+                font=customtkinter.CTkFont(size=13, weight="bold"),
+                text_color="#991b1b"
+            ).pack(anchor="w")
+            names_str = ", ".join(i["name"] for i in low_alerts[:3])
+            customtkinter.CTkLabel(
+                alert_text,
+                text=f"{names_str} below minimum safety thresholds.",
+                font=customtkinter.CTkFont(size=11),
+                text_color="#b91c1c"
+            ).pack(anchor="w")
+
+            reorder_btn = customtkinter.CTkButton(
+                alert_inner,
+                text="Reorder Now",
+                font=customtkinter.CTkFont(size=11, weight="bold"),
+                fg_color="#ef4444",
+                hover_color="#dc2626",
+                height=32,
+                corner_radius=8,
+                command=self.show_receive_stock_dialog
+            )
+            reorder_btn.grid(row=0, column=2, padx=(10, 0))
+        else:
+            self.alert_box.configure(fg_color="#f0fdf4", border_color="#bbf7d0")
+            alert_inner = customtkinter.CTkFrame(self.alert_box, fg_color="transparent")
+            alert_inner.grid(row=0, column=0, padx=16, pady=12, sticky="ew")
+            alert_inner.grid_columnconfigure(1, weight=1)
+
+            customtkinter.CTkLabel(alert_inner, text="✓", font=customtkinter.CTkFont(size=18, weight="bold"), text_color="#16a34a").grid(row=0, column=0, padx=(0, 10))
+            alert_text = customtkinter.CTkFrame(alert_inner, fg_color="transparent")
+            alert_text.grid(row=0, column=1, sticky="w")
+            customtkinter.CTkLabel(
+                alert_text,
+                text="All ingredient stock levels are healthy",
+                font=customtkinter.CTkFont(size=13, weight="bold"),
+                text_color="#166534"
+            ).pack(anchor="w")
+            customtkinter.CTkLabel(
+                alert_text,
+                text="No ingredients currently below par level safety thresholds.",
+                font=customtkinter.CTkFont(size=11),
+                text_color="#15803d"
+            ).pack(anchor="w")
 
     def render_inventory_table(self, query="", category="All Categories"):
         for w in self.table_container.winfo_children():
@@ -392,6 +433,7 @@ class InventoryOverviewView(customtkinter.CTkFrame):
                         break
             dialog.destroy()
             self.render_inventory_table()
+            self.render_metrics_and_alerts()
 
         customtkinter.CTkButton(
             dialog,
@@ -421,6 +463,7 @@ class InventoryOverviewView(customtkinter.CTkFrame):
                 item["on_hand"] = val
             dialog.destroy()
             self.render_inventory_table()
+            self.render_metrics_and_alerts()
 
         customtkinter.CTkButton(dialog, text="Save Adjustment", fg_color="#10b981", hover_color="#059669", height=38, width=320, command=save_adjustment).pack(pady=14)
 

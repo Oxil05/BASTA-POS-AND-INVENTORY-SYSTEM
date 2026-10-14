@@ -1260,9 +1260,10 @@ class BastaPOSApp(customtkinter.CTkToplevel):
         self.checkout_frame.grid_rowconfigure(1, weight=1)
         self.checkout_frame.grid_columnconfigure(0, weight=1)
 
-        # Checkout Title
+        # Checkout Title Box with Clear Order button
         title_box = customtkinter.CTkFrame(self.checkout_frame, fg_color="transparent")
         title_box.grid(row=0, column=0, padx=18, pady=(18, 8), sticky="ew")
+        title_box.grid_columnconfigure(0, weight=1)
 
         checkout_title = customtkinter.CTkLabel(
             title_box,
@@ -1270,7 +1271,21 @@ class BastaPOSApp(customtkinter.CTkToplevel):
             font=customtkinter.CTkFont(size=22, weight="bold"),
             text_color="#09090b"
         )
-        checkout_title.pack(anchor="center")
+        checkout_title.grid(row=0, column=0, sticky="w")
+
+        self.clear_cart_btn = customtkinter.CTkButton(
+            title_box,
+            text="🗑 Clear Order",
+            font=customtkinter.CTkFont(size=11, weight="bold"),
+            fg_color="#f1f5f9",
+            text_color="#94a3b8",
+            hover_color="#fee2e2",
+            height=28,
+            corner_radius=8,
+            state="disabled",
+            command=self.confirm_clear_order
+        )
+        self.clear_cart_btn.grid(row=0, column=1, sticky="e")
 
         # Scrollable items list
         self.order_scroll = customtkinter.CTkScrollableFrame(self.checkout_frame, fg_color="transparent")
@@ -1514,6 +1529,21 @@ class BastaPOSApp(customtkinter.CTkToplevel):
             self.recalculate_totals()
             self.refresh_cart_display()
 
+    def remove_cart_item(self, item_name):
+        """Removes a specific product line item from the active cart ticket."""
+        if item_name in self.cart_items:
+            del self.cart_items[item_name]
+            self.recalculate_totals()
+            self.refresh_cart_display()
+
+    def confirm_clear_order(self):
+        """Prompt cashier to confirm before deleting/clearing entire active order."""
+        if not self.cart_items:
+            return
+        from tkinter import messagebox
+        if messagebox.askyesno("Clear Order", "Are you sure you want to delete and clear all items from this order?"):
+            self.reset_cart()
+
     def reset_cart(self):
         """Reset the cart to empty and clear cash input."""
         self.cart_items.clear()
@@ -1555,6 +1585,8 @@ class BastaPOSApp(customtkinter.CTkToplevel):
             widget.destroy()
 
         if not self.cart_items:
+            if hasattr(self, "clear_cart_btn"):
+                self.clear_cart_btn.configure(state="disabled", fg_color="#f1f5f9", text_color="#94a3b8")
             empty_lbl = customtkinter.CTkLabel(
                 self.order_scroll,
                 text="No items in order yet.\nClick + on any product to add.",
@@ -1563,6 +1595,9 @@ class BastaPOSApp(customtkinter.CTkToplevel):
             )
             empty_lbl.grid(row=0, column=0, columnspan=2, pady=30)
             return
+
+        if hasattr(self, "clear_cart_btn"):
+            self.clear_cart_btn.configure(state="normal", fg_color="#fee2e2", text_color="#dc2626")
 
         for idx, (item_name, item_info) in enumerate(self.cart_items.items()):
             item_row = customtkinter.CTkFrame(self.order_scroll, fg_color="transparent")
@@ -1615,7 +1650,7 @@ class BastaPOSApp(customtkinter.CTkToplevel):
             )
             notes_lbl.grid(row=0, column=0, sticky="w")
 
-            # Stepper pill
+            # Stepper pill with decrement, count, increment, and remove button
             stepper_frame = customtkinter.CTkFrame(sub_row, fg_color="#f1f5f9", corner_radius=14)
             stepper_frame.grid(row=0, column=1, sticky="e")
 
@@ -1637,6 +1672,14 @@ class BastaPOSApp(customtkinter.CTkToplevel):
                 command=lambda n=item_name: self.increment_cart_item(n)
             )
             plus_btn.pack(side="left", padx=2)
+
+            remove_btn = customtkinter.CTkButton(
+                stepper_frame, text="✕", width=22, height=22, corner_radius=11,
+                fg_color="transparent", text_color="#ef4444", hover_color="#fee2e2",
+                font=customtkinter.CTkFont(size=11, weight="bold"),
+                command=lambda n=item_name: self.remove_cart_item(n)
+            )
+            remove_btn.pack(side="left", padx=(2, 4))
 
     def select_category(self, cat_name):
         """Update active category pill style and filter catalog."""
